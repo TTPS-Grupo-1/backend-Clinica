@@ -33,14 +33,31 @@ class CreatePacienteMixin:
 
         except IntegrityError as e:
             logger.error(f"Error de integridad: {str(e)}")
-            return Response({
-                "success": False,
-                "message": "El paciente ya existe o hay un campo duplicado."
-            }, status=status.HTTP_400_BAD_REQUEST)
+            # Analiza el mensaje de error para saber si es email o dni duplicado
+            error_msg = str(e).lower()
+            if 'email' in error_msg:
+                return Response({
+                    "success": False,
+                    "message": "Ya existe un paciente registrado con este email.",
+                    "errors": {"email": ["Ya existe un paciente registrado con este email."]}
+                }, status=status.HTTP_400_BAD_REQUEST)
+            elif 'dni' in error_msg:
+                return Response({
+                    "success": False,
+                    "message": "Ya existe un paciente registrado con este DNI.",
+                    "errors": {"dni": ["Ya existe un paciente registrado con este DNI."]}
+                }, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({
+                    "success": False,
+                    "message": "Error de integridad en la base de datos.",
+                    "errors": {"non_field_errors": ["Error de integridad en la base de datos."]}
+                }, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
             logger.exception("Error inesperado al crear paciente.")
             return Response({
                 "success": False,
-                "message": "Ocurrió un error al registrar el paciente."
+                "message": "Ocurrió un error al registrar el paciente.",
+                "errors": {"server": ["Error interno del servidor"]}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
