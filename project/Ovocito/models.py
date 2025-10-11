@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.validators import MinLengthValidator
 from .validators import validar_identificador
+from Paciente.models import Paciente
 
 
 class Ovocito(models.Model):
@@ -15,6 +16,12 @@ class Ovocito(models.Model):
 	"""
 
 	id_ovocito = models.AutoField(primary_key=True)
+	paciente = models.ForeignKey(
+		Paciente,
+		on_delete=models.CASCADE,
+		related_name='ovocitos',
+		help_text='Paciente al que pertenece el ovocito'
+	)
 
 
 	identificador = models.CharField(
