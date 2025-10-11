@@ -2,6 +2,8 @@ from django.db import models
 from django.core.validators import RegexValidator, MinLengthValidator, EmailValidator
 from datetime import date
 from django.core.exceptions import ValidationError
+from django.contrib.auth.models import User
+from django.core.validators import MinLengthValidator, EmailValidator
 
 solo_letras = RegexValidator(r'^[a-zA-ZáéíóúÁÉÍÓÚ\s]+$', 'Solo se permiten letras.')
 solo_numeros = RegexValidator(r'^\d+$', 'Solo se permiten números.')
@@ -15,25 +17,9 @@ def validar_fecha_nacimiento(value):
         raise ValidationError("El paciente debe ser mayor de 18 años.")
 
 class Paciente(models.Model):
-    nombre = models.CharField(
-        max_length=100,
-        validators=[solo_letras],
-        default='',
-        blank=False
-    )
-    apellido = models.CharField(
-        max_length=100,
-        validators=[solo_letras],
-        default='',
-        blank=False
-    )
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='paciente', null=True, blank=True)
     fecha_nacimiento = models.DateField(
         validators=[validar_fecha_nacimiento],
-        blank=False
-    )
-    email = models.EmailField(
-        unique=True,
-        validators=[EmailValidator(message='Debe ingresar un correo válido.')],
         blank=False
     )
     telefono = models.CharField(
@@ -51,11 +37,6 @@ class Paciente(models.Model):
         choices=[('M', 'Masculino'), ('F', 'Femenino'), ('O', 'Otro')],
         blank=False
     )
-    contraseña = models.CharField(
-        max_length=128,
-        validators=[MinLengthValidator(6, 'La contraseña debe tener al menos 6 caracteres.')],
-        blank=False
-    )
     numero_afiliado = models.CharField(
         max_length=50,
         validators=[solo_numeros],
@@ -67,6 +48,13 @@ class Paciente(models.Model):
         validators=[solo_numeros, MinLengthValidator(7, 'El DNI debe tener al menos 7 dígitos.')],
         blank=False
     )
+    @property
+    def nombre(self):
+        return self.user.first_name if self.user else ''
+    
+    @property
+    def apellido(self):
+        return self.user.last_name if self.user else ''
 
     class Meta:
         db_table = 'Paciente'

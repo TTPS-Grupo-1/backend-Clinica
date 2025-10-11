@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import Paciente
 from datetime import date
 import re
-
+from django.contrib.auth.models import User
 class PacienteSerializer(serializers.ModelSerializer):
 
     
@@ -22,4 +22,8 @@ class PacienteSerializer(serializers.ModelSerializer):
                 }
             }
         
-    
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Este email ya está registrado.")
+        return value
+

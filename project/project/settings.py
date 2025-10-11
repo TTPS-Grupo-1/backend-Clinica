@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'Paciente',
     'Ovocito',
     'Medicos',
+    'rest_framework.authtoken',
 ]
 
 MIDDLEWARE = [
