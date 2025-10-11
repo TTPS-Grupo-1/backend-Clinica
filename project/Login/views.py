@@ -4,6 +4,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.forms.models import model_to_dict
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
 
 class LoginAPIView(APIView):
     permission_classes = []  # público
@@ -95,10 +97,11 @@ class LoginAPIView(APIView):
         }, status=status.HTTP_200_OK)
 
 class LogoutAPIView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
-        try:
-            Token.objects.filter(user=request.user).delete()
-        except Exception:
-            pass
+        # delete token(s) for the authenticated user and return count
+        deleted_count, _ = Token.objects.filter(user=request.user).delete()
         logout(request)
-        return Response({"success": True, "message": "Logout exitoso."})
+        return Response({"success": True, "deleted": deleted_count})
