@@ -20,6 +20,7 @@ class Migration(migrations.Migration):
                 ('estado', models.CharField(choices=[('muy_inmaduro', 'Muy inmaduro'), ('inmaduro', 'Inmaduro'), ('maduro', 'Maduro')], default='muy_inmaduro', max_length=20)),
                 ('cripreservar', models.BooleanField(default=False)),
                 ('descartado', models.BooleanField(default=False)),
+                ('paciente', models.ForeignKey(to='Paciente.paciente', on_delete=models.CASCADE, related_name='ovocitos', help_text='Paciente al que pertenece el ovocito')),
             ],
             options={
                 'verbose_name': 'Ovocito',
