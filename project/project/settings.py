@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'Paciente',
     'Ovocito',
     'Medicos',
+    'Puncion',
     'rest_framework.authtoken',
 ]
 

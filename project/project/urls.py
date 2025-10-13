@@ -23,6 +23,7 @@ urlpatterns = [
     path('api/', include('Paciente.urls')),
     path('api/', include('Ovocito.urls')),
     path('api/', include('Medicos.urls')),
+    path('api/', include('Puncion.urls')),
     path('api/login/', LoginAPIView.as_view(), name='login'),
     path('api/logout/', LogoutAPIView.as_view(), name='logout'),
 ]

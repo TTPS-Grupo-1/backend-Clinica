@@ -22,6 +22,14 @@ class Ovocito(models.Model):
 		related_name='ovocitos',
 		help_text='Paciente al que pertenece el ovocito'
 	)
+	puncion = models.ForeignKey(
+		'Puncion.Puncion',
+		on_delete=models.CASCADE,
+		related_name='ovocitos',
+		null=True,
+		blank=True,
+		help_text='Punción asociada a este ovocito'
+	)
 
 
 	identificador = models.CharField(
