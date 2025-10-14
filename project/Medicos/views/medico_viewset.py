@@ -1,12 +1,7 @@
 from rest_framework import viewsets
-from ..models import Medico
-from ..serializers import MedicoSerializer
+from Medicos.models import Medico
+from Medicos.serializers import MedicoSerializer
 from .create_medico_view import CreateMedicoMixin
-
-import logging
-
-logger = logging.getLogger(__name__)
-
 
 class MedicoViewSet(
     CreateMedicoMixin,
@@ -18,3 +13,4 @@ class MedicoViewSet(
     """
     queryset = Medico.objects.all()
     serializer_class = MedicoSerializer
+    lookup_field = 'dni'  # 👈 Usa DNI en lugar de pk
