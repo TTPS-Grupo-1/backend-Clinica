@@ -5,7 +5,7 @@ from django.contrib.auth.hashers import make_password
 class MedicoSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True, 
-        required=False,  # Ahora es False, pero validaremos en validate()
+        required=False,
         min_length=8,
         allow_blank=False
     )
@@ -28,7 +28,6 @@ class MedicoSerializer(serializers.ModelSerializer):
                 'password': 'La contraseña es requerida al crear un médico'
             })
         
-        # Si es creación y la contraseña está vacía
         if not self.instance and attrs.get('password', '').strip() == '':
             raise serializers.ValidationError({
                 'password': 'La contraseña no puede estar vacía'
@@ -37,12 +36,13 @@ class MedicoSerializer(serializers.ModelSerializer):
         return attrs
     
     def create(self, validated_data):
-        # Hashear la contraseña antes de crear
         if 'password' in validated_data:
             validated_data['password'] = make_password(validated_data['password'])
         return super().create(validated_data)
     
     def update(self, instance, validated_data):
-        # No permitir actualizar contraseña desde aquí (eliminarla si viene)
+        # No permitir actualizar contraseña desde aquí
         validated_data.pop('password', None)
+        
+        # 👇 ESTO ES LO IMPORTANTE: Permitir actualizar eliminado
         return super().update(instance, validated_data)

@@ -9,7 +9,8 @@ class Medico(models.Model):
     email = models.EmailField(unique=True)
     telefono = models.IntegerField()
     password = models.CharField(max_length=128, default='')  # Campo para contraseña hasheada
-    
+    eliminado = models.BooleanField(default=False)
+
     class Meta:
         db_table = 'medico'
     
