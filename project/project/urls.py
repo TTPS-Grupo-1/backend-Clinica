@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/', include('Medicos.urls')),
     path('api/', include('Puncion.urls')),
     path('api/', include('Embrion.urls')),
+    path('api/', include('Fertilizacion.urls')),
     path('api/login/', LoginAPIView.as_view(), name='login'),
     path('api/logout/', LogoutAPIView.as_view(), name='logout'),
 ]
