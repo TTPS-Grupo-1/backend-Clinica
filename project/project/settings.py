@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'Ovocito',
     'Medicos',
     'Puncion',
+    'Embrion',
     'rest_framework.authtoken',
 ]
 
