@@ -11,7 +11,7 @@ class PrimeraConsulta(models.Model):
         'Medico',
         on_delete=models.SET_NULL,
         null=True,
-        related_name='consultas_realizadas'
+        related_name='primeras_consultas_realizadas'
     )
 
     objetivo_consulta = models.TextField()

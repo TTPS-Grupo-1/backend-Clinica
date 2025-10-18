@@ -1,5 +1,5 @@
 from django.db import models
-
+from PrimerConsulta.models import PrimeraConsulta
 class AntecedentesGinecologicos(models.Model):
     # Edad de la primera menstruación (menarca)
     menarca = models.PositiveSmallIntegerField(
@@ -77,6 +77,12 @@ class AntecedentesGinecologicos(models.Model):
         blank=True,
         help_text="Número de embarazos ectópicos (ST)."
     )
+    
+    consulta = models.ForeignKey(
+			PrimeraConsulta,
+			on_delete=models.CASCADE,
+			related_name="antecedentes_ginecologicos"
+	)
 
  
     def __str__(self):

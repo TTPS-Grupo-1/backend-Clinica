@@ -1,5 +1,5 @@
 from django.db import models
-
+from PrimerConsulta.models import PrimeraConsulta
 
 class Fenotipo(models.Model):
 	"""Modelo que representa características fenotípicas del paciente.
@@ -55,6 +55,12 @@ class Fenotipo(models.Model):
 		"rasgos étnicos generales",
 		blank=True,
 		help_text="Ej: europeo, latino, afrodescendiente, etc.",
+	)
+ 
+	consulta = models.ForeignKey(
+			PrimeraConsulta,
+			on_delete=models.CASCADE,
+			related_name="fenotipos"
 	)
  
     

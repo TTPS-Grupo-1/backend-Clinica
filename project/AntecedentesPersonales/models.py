@@ -1,5 +1,5 @@
 from django.db import models
-
+from PrimerConsulta.models import PrimeraConsulta
 
 class AntecedentesPersonales(models.Model):
 	"""Modelo para antecedentes personales relacionados con hábitos.
@@ -40,6 +40,12 @@ class AntecedentesPersonales(models.Model):
 
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
+ 
+	consulta = models.ForeignKey(
+			PrimeraConsulta,
+			on_delete=models.CASCADE,
+			related_name="antecedentes_personales"
+	)
 
 	def __str__(self):
 		if self.fuma_pack_dias:
