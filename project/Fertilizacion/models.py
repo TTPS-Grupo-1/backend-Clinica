@@ -32,14 +32,15 @@ class Fertilizacion(models.Model):
 
 	fecha_fertilizacion = models.DateField()
 
-	tecnico = models.ForeignKey(
-		settings.AUTH_USER_MODEL,
-		on_delete=models.SET_NULL,
-		null=True,
-		blank=True,
-		related_name='fertilizaciones_registradas',
-		help_text='Usuario (técnico) que registró la fertilización'
-	)
+	# tecnico = models.ForeignKey(
+	#     settings.AUTH_USER_MODEL,
+	#     on_delete=models.SET_NULL,
+	#     null=True,
+	#     blank=True,
+	#     related_name='fertilizaciones_registradas',
+	#     help_text='Usuario (técnico) que registró la fertilización'
+	# )
+	tecnico_laboratorio = models.CharField(max_length=100, null=True, blank=True, help_text='Nombre del técnico que registró la fertilización')
 
 	# Técnica representada como dos booleanos (uno debe ser True)
 	tecnica_icsi = models.BooleanField(default=False, help_text='True si la técnica fue ICSI')
