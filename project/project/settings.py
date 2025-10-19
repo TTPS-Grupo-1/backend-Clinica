@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'AntecedentesGinecologicos',
     'AntecedentesPersonales',
     'Fenotipo',
+    'Fertilizacion',
     'rest_framework.authtoken',
 ]
 
