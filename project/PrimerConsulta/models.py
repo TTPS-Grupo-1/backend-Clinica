@@ -2,21 +2,22 @@ from django.db import models
 
 class PrimeraConsulta(models.Model):
     paciente = models.ForeignKey(
-        'Paciente',
+        'Paciente.Paciente',
         on_delete=models.CASCADE,
-        related_name='consultas'
+        null=True,
+        related_name='primeras_consultas'
     )
 
     medico = models.ForeignKey(
-        'Medico',
+        'Medicos.Medico',
         on_delete=models.SET_NULL,
         null=True,
         related_name='primeras_consultas_realizadas'
     )
 
-    objetivo_consulta = models.TextField()
+    objetivo_consulta = models.TextField(null=True, blank=True)
 
-    antecedentes_familiares_1 = models.TextField()
+    antecedentes_familiares_1 = models.TextField(null=True, blank=True)
     antecedentes_familiares_2 = models.TextField(null=True, blank=True)
     
     antecedentes_genitales = models.TextField(null=True, blank=True)
