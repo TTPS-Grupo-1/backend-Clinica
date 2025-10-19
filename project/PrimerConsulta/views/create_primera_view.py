@@ -36,25 +36,31 @@ class CreatePrimeraConsultaMixin:
         consulta_data['objetivo_consulta'] = payload.get('objetivo') or payload.get('objetivo_consulta')
 
         # Obtener paciente y medico (buscar en payload o en form)
+       # Obtener paciente y médico (admite *_id o relaciones)
         form = payload.get('form', {}) if isinstance(payload, dict) else {}
-        paciente_id = payload.get('paciente') or form.get('paciente_id') or form.get('paciente')
-        medico_id = payload.get('medico') or form.get('medico_id') or form.get('medico')
+
+        paciente_id = (
+            payload.get('paciente_id')
+            or payload.get('paciente')
+            or form.get('paciente_id')
+            or form.get('paciente')
+        )
+
+        medico_id = (
+            payload.get('medico_id')
+            or payload.get('medico')
+            or form.get('medico_id')
+            or form.get('medico')
+        )
+        
+        print("paciente_id:", paciente_id)
+        print("medico_id:", medico_id)
+
 
         if paciente_id:
-            consulta_data['paciente'] = paciente_id
-        else:
-            # si no viene paciente, intentar usar user asociado (opcional)
-            user = getattr(request, 'user', None)
-            paciente_fk = None
-            try:
-                paciente_fk = getattr(user, 'paciente', None)
-            except Exception:
-                paciente_fk = None
-            if paciente_fk:
-                consulta_data['paciente'] = paciente_fk.id
-
+            consulta_data['paciente'] = paciente_id  
         if medico_id:
-            consulta_data['medico'] = medico_id
+            consulta_data['medico'] = medico_id     
 
         # Preparar serializer solo para la consulta (sin antecedentes)
         # Mapear campos de 'form' adicionales al modelo PrimeraConsulta
