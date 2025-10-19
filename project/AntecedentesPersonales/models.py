@@ -9,10 +9,9 @@ class AntecedentesPersonales(models.Model):
 	"""
 
 	# pack-días: se permite decimal (por ejemplo 2.5)
-	fuma_pack_dias = models.DecimalField(
+	fuma_pack_dias = models.CharField(
 		"fuma (pack-días)",
-		max_digits=6,
-		decimal_places=2,
+		max_length=6,
 		null=True,
 		blank=True,
 		help_text="Ej: 10 cigarrillos/día * 5 años / 20 = 2.5",

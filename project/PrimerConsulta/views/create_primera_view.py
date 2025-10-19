@@ -6,6 +6,8 @@ from ..models import PrimeraConsulta
 from .. import models as pc_models
 from .. import serializers as pc_serializers
 from AntecedentesGinecologicos.models import AntecedentesGinecologicos
+from AntecedentesPersonales.models import AntecedentesPersonales
+from Fenotipo.models import Fenotipo
 import logging
 
 logger = logging.getLogger(__name__)
@@ -127,9 +129,17 @@ class CreatePrimeraConsultaMixin:
 
         # Extraer antecedentes ginecológicos desde payload.form
         antecedentes_payload = None
+        antecedentes_payload2 = None
+
         try:
-            antig = form.get('antecedentes_ginecologicos', {}) or {'antecedentes_ginecologicos_mujer1'}
+            # 🔹 Buscar antecedentes ginecológicos (mujer 1 o general)
+            antig = (
+                form.get('antecedentes_ginecologicos')
+                or form.get('antecedentes_ginecologicos_mujer1')
+                or {}
+            )
             datos1 = antig.get('datos1', {}) or {}
+
             antecedentes_payload = {
                 'menarca': safe_int(datos1.get('menarca')),
                 'ciclo_menstrual': safe_int(datos1.get('ciclos')),
@@ -141,32 +151,82 @@ class CreatePrimeraConsultaMixin:
                 'ab': safe_int(datos1.get('ab')),
                 'st': safe_int(datos1.get('st')),
             }
-            antig2 = form.get('antecedentes_ginecologicos_mujer2', {}) or {}
+
+            # 🔹 Buscar antecedentes ginecológicos (mujer 2)
+            antig2 = form.get('antecedentes_ginecologicos_mujer2') or {}
             datos2 = antig2.get('datos1', {}) or {}
 
             antecedentes_payload2 = {
-                'menarca_2': safe_int(datos2.get('menarca')),
-                'ciclo_menstrual_2': safe_int(datos2.get('ciclos')),
-                'regularidad_2': datos2.get('regularidad') or None,
-                'duracion_menstrual_dias_2': safe_int(datos2.get('duracion')),
-                'caracteristicas_sangrado_2': datos2.get('sangrado') or None,
-                'g_2': safe_int(datos2.get('g')),
-                'p_2': safe_int(datos2.get('p')),
-                'ab_2': safe_int(datos2.get('ab')),
-                'st_2': safe_int(datos2.get('st')),
+                'menarca': safe_int(datos2.get('menarca')),
+                'ciclo_menstrual': safe_int(datos2.get('ciclos')),
+                'regularidad': datos2.get('regularidad') or None,
+                'duracion_menstrual_dias': safe_int(datos2.get('duracion')),
+                'caracteristicas_sangrado': datos2.get('sangrado') or None,
+                'g': safe_int(datos2.get('g')),
+                'p': safe_int(datos2.get('p')),
+                'ab': safe_int(datos2.get('ab')),
+                'st': safe_int(datos2.get('st')),
             }
-        except Exception:
+
+        except Exception as e:
+            print("🔥 Error en bloque ginecológicos:", type(e).__name__, e)
             antecedentes_payload = None
             antecedentes_payload2 = None
+
+
+        # 🔹 Antecedentes personales
+        antp = (
+            form.get('personales')
+            or form.get('personales_mujer1')
+            or form.get('personales_mujer')
+            or {}
+        )
+        print("antp:", antp)
+
+        antecedentes_personales_payload = {
+            'fuma_pack_dias': antp.get('fuma'),
+            'consume_alcohol': antp.get('alcohol'),
+            'drogas_recreativas': antp.get('drogas'),
+            'observaciones_habitos': antp.get('observaciones'),
+        }
+        print("payload personales 1:", antecedentes_personales_payload)
+
+        antp2 = (
+            form.get('personales_mujer2')
+            or form.get('personales_hombre')
+            or {}
+        )
+        print("antp2:", antp2)
+
+        antecedentes_personales_payload2 = {
+            'fuma_pack_dias': antp2.get('fuma'),
+            'consume_alcohol': antp2.get('alcohol'),
+            'drogas_recreativas': antp2.get('drogas'),
+            'observaciones_habitos': antp2.get('observaciones'),
+        }
+        print("payload personales 2:", antecedentes_personales_payload2)
+
+
+        # 🔹 Fenotipo
         try:
-            antp = form.get('personales') or {'personales_mujer1'} or {'personales_mujer'}
-            antecedentes_personales_payload = {}
+            fenotipo_data = form.get('fenotipo', {}) or {}
+            fenotipo_payload = {
+                'color_ojos': fenotipo_data.get('ojos'),
+                'color_pelo': fenotipo_data.get('peloColor'),
+                'tipo_pelo': fenotipo_data.get('peloTipo'),
+                'altura_cm': safe_int(fenotipo_data.get('altura')),
+                'complexion_corporal': fenotipo_data.get('complexion'),
+                'rasgos_etnicos': fenotipo_data.get('etnia'),
+            }
+            print("fenotipo:", fenotipo_payload)
 
-        except Exception:
-            antecedentes_payload = None
-            antecedentes_payload2 = None
+        except Exception as e:
+            print("🔥 Error en bloque fenotipo:", type(e).__name__, e)
+            fenotipo_payload = None
 
-        #except Exception:
+ 
+                
+            
             
 
         # Crear todo en una transacción para mantener consistencia
@@ -181,6 +241,16 @@ class CreatePrimeraConsultaMixin:
                     
                 if antecedentes_payload2 and any(v is not None for v in antecedentes_payload2.values()):
                     AntecedentesGinecologicos.objects.create(consulta=consulta, **antecedentes_payload2)
+                if antecedentes_personales_payload and any(v not in [None, ""] for v in antecedentes_personales_payload.values()):
+                    logger.info(f"Creando AntecedentesPersonales1: {antecedentes_personales_payload}")
+
+                    AntecedentesPersonales.objects.create(consulta=consulta, **antecedentes_personales_payload)
+                if antecedentes_personales_payload2 and any(v not in [None, ""] for v in antecedentes_personales_payload2.values()):
+                    logger.info(f"Creando AntecedentesPersonales2: {antecedentes_personales_payload2}")
+                    AntecedentesPersonales.objects.create(consulta=consulta, **antecedentes_personales_payload2)
+                    
+                if fenotipo_payload and any(v not in [None, ""] for v in fenotipo_payload.values()):
+                    Fenotipo.objects.create(consulta=consulta, **fenotipo_payload)
 
             logger.info(f"Primera consulta creada: {consulta.id}")
             return Response(
