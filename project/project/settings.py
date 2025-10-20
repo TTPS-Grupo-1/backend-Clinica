@@ -58,6 +58,8 @@ INSTALLED_APPS = [
     'Fertilizacion',
     'rest_framework.authtoken',
     'CustomUser',
+    'ResultadoEstudio',
+    'Orden',
 ]
 
 AUTH_USER_MODEL = 'CustomUser.CustomUser'
