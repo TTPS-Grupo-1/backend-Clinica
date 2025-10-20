@@ -44,9 +44,16 @@ INSTALLED_APPS = [
     'Medicos',
     'Puncion',
     'Embrion',
+    'PrimerConsulta',
+    'AntecedentesGinecologicos',
+    'AntecedentesPersonales',
+    'Fenotipo',
     'Fertilizacion',
     'rest_framework.authtoken',
+    'CustomUser',
 ]
+
+AUTH_USER_MODEL = 'CustomUser.CustomUser'
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -183,3 +190,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite (React)
     "http://localhost:3000",  # CRA
 ]
+
+import os
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

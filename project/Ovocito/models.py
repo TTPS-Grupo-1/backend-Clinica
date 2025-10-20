@@ -1,7 +1,7 @@
 from django.db import models
 from django.core.validators import MinLengthValidator
 from .validators import validar_identificador
-from Paciente.models import Paciente
+from CustomUser.models import CustomUser as Paciente
 
 
 class Ovocito(models.Model):

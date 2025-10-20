@@ -10,10 +10,8 @@ Este paquete contiene todas las vistas separadas por funcionalidad:
 """
 
 # Importar todas las vistas para facilitar el acceso
-from .create_paciente_view import CreatePacienteMixin
 from .paciente_viewset import PacienteViewSet
 
 __all__ = [
-    'CreatePacienteMixin',
     'PacienteViewSet'
 ]

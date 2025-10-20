@@ -1,5 +1,5 @@
 from django.db import models
-from Paciente.models import Paciente
+from CustomUser.models import CustomUser as Paciente
 
 class Puncion(models.Model):
 	paciente = models.ForeignKey(
