@@ -17,6 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from  Login.views import LoginAPIView, LogoutAPIView
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -24,7 +26,13 @@ urlpatterns = [
     path('api/', include('Ovocito.urls')),
     path('api/', include('Medicos.urls')),
     path('api/', include('Puncion.urls')),
+    path('api/', include('Embrion.urls')),
+    path('api/', include('PrimerConsulta.urls')),
+    path('api/', include('Fertilizacion.urls')),
     path('api/login/', LoginAPIView.as_view(), name='login'),
     path('api/logout/', LogoutAPIView.as_view(), name='logout'),
     path('api/', include('Turnos.urls')),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

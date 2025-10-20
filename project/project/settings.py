@@ -43,9 +43,18 @@ INSTALLED_APPS = [
     'Ovocito',
     'Medicos',
     'Puncion',
+    'Embrion',
+    'PrimerConsulta',
+    'AntecedentesGinecologicos',
+    'AntecedentesPersonales',
+    'Fenotipo',
+    'Fertilizacion',
     'rest_framework.authtoken',
     'Turnos',
+    'CustomUser',
 ]
+
+AUTH_USER_MODEL = 'CustomUser.CustomUser'
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -108,13 +117,10 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# Password Hashers - Configuración para usar bcrypt
+# Password Hashers - Configuración para usar PBKDF2 (hasher por defecto de Django)
 PASSWORD_HASHERS = [
-    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
-    'django.contrib.auth.hashers.BCryptPasswordHasher',
     'django.contrib.auth.hashers.PBKDF2PasswordHasher',
     'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
-    'django.contrib.auth.hashers.Argon2PasswordHasher',
 ]
 
 
@@ -182,3 +188,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite (React)
     "http://localhost:3000",  # CRA
 ]
+
+import os
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
