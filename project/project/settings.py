@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'Medicos',
     'Puncion',
     'rest_framework.authtoken',
+    'Turnos',
 ]
 
 MIDDLEWARE = [

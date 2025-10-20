@@ -26,4 +26,5 @@ urlpatterns = [
     path('api/', include('Puncion.urls')),
     path('api/login/', LoginAPIView.as_view(), name='login'),
     path('api/logout/', LogoutAPIView.as_view(), name='logout'),
+    path('api/', include('Turnos.urls')),
 ]
