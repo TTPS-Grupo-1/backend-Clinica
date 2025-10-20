@@ -2,14 +2,14 @@ from django.db import models
 
 class PrimeraConsulta(models.Model):
     paciente = models.ForeignKey(
-        'Paciente.Paciente',
+        'CustomUser.CustomUser',
         on_delete=models.CASCADE,
         null=True,
         related_name='primeras_consultas'
     )
 
     medico = models.ForeignKey(
-        'Medicos.Medico',
+        'CustomUser.CustomUser',
         on_delete=models.SET_NULL,
         null=True,
         related_name='primeras_consultas_realizadas'
