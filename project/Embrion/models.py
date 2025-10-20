@@ -4,16 +4,26 @@ from django.utils import timezone
 
 class Embrion(models.Model):
 	identificador = models.CharField(max_length=50, unique=True, help_text="Identificador único del embrión (EMB...)")
-	fecha_fertilizacion = models.DateField(help_text="Fecha de fertilización")
-	ovocito = models.ForeignKey('Ovocito.Ovocito', on_delete=models.CASCADE, related_name="embriones", help_text="Ovocito relacionado")
-	tecnica = models.CharField(max_length=100, help_text="Técnica utilizada")
-	tecnico_laboratorio = models.CharField(max_length=100, help_text="Técnico de laboratorio responsable")
-	calidad = models.IntegerField(choices=[(i, str(i)) for i in range(1, 6)], help_text="Calidad del embrión (1-5)")
-	estado = models.CharField(max_length=20, choices=[("transferido", "Transferido"), ("no_transferido", "No transferido")], help_text="Estado del embrión")
-	fecha_alta = models.DateField(default=timezone.now, help_text="Fecha de alta")
-	fecha_baja = models.DateField(null=True, blank=True, help_text="Fecha de baja")
+
+	fertilizacion = models.OneToOneField(
+		'Fertilizacion.Fertilizacion',
+		on_delete=models.CASCADE,
+		related_name='embrion',
+		null=True,
+		help_text='Fertilización de la cual proviene este embrión'
+	)
+	
+
+	
+	calidad = models.IntegerField(choices=[(i, str(i)) for i in range(1, 6)], help_text="Calidad del embrión (1-5)", blank=True, null=True)
+	estado = models.CharField(max_length=20, choices=[("transferido", "Transferido"),("no transferido", "No Transferido"),("criopreservado", "Criopreservado"), ("descartado", "Descartado"), ("fresco", "Fresco")], help_text="Estado del embrión")
 	fecha_modificacion = models.DateTimeField(auto_now=True, help_text="Fecha de última modificación")
-	info_semen = models.TextField(help_text="Información del semen")
+	pgt = models.CharField(max_length=20, choices=[("exitoso", "Exitoso"), ("no exitoso", "No Exitoso")], default="no realizado", help_text="Resultado del PGT", blank=True, null=True)
+	observaciones = models.TextField(blank=True, null=True, help_text="Observaciones adicionales sobre el embrión")
+	fecha_baja = models.DateTimeField(blank=True, null=True, help_text="Fecha de baja del embrión")
+	causa_descarte = models.TextField(blank=True, null=True, help_text="Causa de descarte del embrión")
+
+
 
 	def __str__(self):
 		return self.identificador
