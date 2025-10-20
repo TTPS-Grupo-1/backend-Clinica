@@ -10,18 +10,14 @@ User = get_user_model()
 
 class PacienteViewSet(viewsets.ModelViewSet):
     """
-    ViewSet principal para la gestión de pacientes.
-    Usa el modelo CustomUser (rol='PACIENTE').
-    
-    Endpoints:
-      - GET/POST /api/pacientes/
-      - GET/PUT/PATCH/DELETE /api/pacientes/{id}/
+    ViewSet para gestionar pacientes usando CustomUser.
+    Rol forzado: PACIENTE
     """
     serializer_class = CustomUserSerializer
     lookup_field = 'id'
 
     # --------------------------------------------------------
-    # 🔹 Queryset: solo pacientes activos o filtrados
+    # 🔹 Filtrar solo usuarios con rol PACIENTE
     # --------------------------------------------------------
     def get_queryset(self):
         queryset = User.objects.filter(rol='PACIENTE')
@@ -30,13 +26,67 @@ class PacienteViewSet(viewsets.ModelViewSet):
         return queryset.order_by('last_name', 'first_name')
 
     # --------------------------------------------------------
-    # 🔹 Crear paciente (forzando el rol)
+    # 🔹 Crear paciente con validaciones
     # --------------------------------------------------------
-    def perform_create(self, serializer):
-        password = self.request.data.get('password')
+    def create(self, request, *args, **kwargs):
+        data = request.data.copy()
+        password = data.get("password")
+
+        # Validar que haya password
         if not password:
-            raise ValueError("El campo 'password' es obligatorio para crear un paciente.")
-        serializer.save(password=password, rol='PACIENTE')
+            return Response(
+                {"success": False, "message": "El campo 'password' es obligatorio."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = self.get_serializer(data=data)
+        if not serializer.is_valid():
+            logger.warning(f"❌ Errores de validación: {serializer.errors}")
+            return Response(
+                {
+                    "success": False,
+                    "message": "Hay errores en los datos ingresados.",
+                    "errors": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Crear usuario CustomUser (usa create_user para hashear la password)
+            user = User.objects.create_user(
+                email=serializer.validated_data["email"],
+                password=password,
+                first_name=serializer.validated_data.get("first_name", ""),
+                last_name=serializer.validated_data.get("last_name", ""),
+                dni=serializer.validated_data.get("dni"),
+                telefono=serializer.validated_data.get("telefono", ""),
+                rol="PACIENTE",
+                numero_afiliado=serializer.validated_data.get("numero_afiliado"),
+                obra_social=serializer.validated_data.get("obra_social"),
+                fecha_nacimiento=serializer.validated_data.get("fecha_nacimiento"),
+                sexo=serializer.validated_data.get("sexo"),
+                
+            )
+
+            logger.info(f"🧍 Paciente creado correctamente: {user.email}")
+            return Response(
+                {
+                    "success": True,
+                    "message": "Paciente registrado correctamente.",
+                    "data": CustomUserSerializer(user).data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
+        except Exception as e:
+            logger.exception("⚠️ Error inesperado al crear paciente")
+            return Response(
+                {
+                    "success": False,
+                    "message": f"Error al registrar paciente: {str(e)}",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     # --------------------------------------------------------
     # 🔹 Eliminado lógico
