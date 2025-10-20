@@ -116,13 +116,10 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# Password Hashers - Configuración para usar bcrypt
+# Password Hashers - Configuración para usar PBKDF2 (hasher por defecto de Django)
 PASSWORD_HASHERS = [
-    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
-    'django.contrib.auth.hashers.BCryptPasswordHasher',
     'django.contrib.auth.hashers.PBKDF2PasswordHasher',
     'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
-    'django.contrib.auth.hashers.Argon2PasswordHasher',
 ]
 
 
