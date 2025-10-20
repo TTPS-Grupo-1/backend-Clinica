@@ -27,6 +27,13 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',  # o JWT si usás eso
+    ],
+}
+
+
 
 # Application definition
 
@@ -186,11 +193,20 @@ LOGGING = {
     },
 }
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Vite (React)
-    "http://localhost:3000",  # CRA
+
+
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+CORS_ALLOW_CREDENTIALS = True
 import os
 
 MEDIA_URL = '/media/'

@@ -74,8 +74,6 @@ class LogoutAPIView(APIView):
     """
     Cierra la sesión y elimina el token del usuario autenticado.
     """
-    authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         Token.objects.filter(user=request.user).delete()
