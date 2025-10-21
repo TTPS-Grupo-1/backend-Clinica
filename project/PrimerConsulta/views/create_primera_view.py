@@ -10,6 +10,7 @@ from AntecedentesPersonales.models import AntecedentesPersonales
 from Fenotipo.models import Fenotipo
 from ResultadoEstudio.models import ResultadoEstudio
 from Orden.models import Orden
+from Orden.orden_service import generar_orden_y_guardar
 import logging
 
 logger = logging.getLogger(__name__)
@@ -241,7 +242,7 @@ class CreatePrimeraConsultaMixin:
 
         try:
             # --- Estudios prequirúrgicos ---
-            e1 = form.get('estudios_prequirurgicos') or form.get('estudios_prequirurgicos_mujer1') or {}
+            e1 = form.get('estudios_prequirurgicos') or form.get('estudios_prequirurgicos_mujer1') or form.get('estudios_prequirurgicos_mujer') or form.get('prequirurgicos') or {}
             e2 = form.get('estudios_prequirurgicos_mujer2') or form.get('estudios_prequirurgicos_hombre') or {}
             print("estudios prequirurgicos 1 raw:", e1)
             print("estudios prequirurgicos 2 raw:", e2)
@@ -286,7 +287,99 @@ class CreatePrimeraConsultaMixin:
                 if fenotipo_payload and any(v not in [None, ""] for v in fenotipo_payload.values()):
                     Fenotipo.objects.create(consulta=consulta, **fenotipo_payload)
                     
-                
+                if estudios_ginecologicos_1:
+                    for estudio_nombre in estudios_ginecologicos_1:
+                        ResultadoEstudio.objects.create(
+                            consulta=consulta,
+                            tipo_estudio="GINECOLOGICO",
+                            nombre_estudio=estudio_nombre,
+                        )
+                    generar_orden_y_guardar(consulta=consulta,
+                                            tipo_estudio="Estudios ginecológicos",
+                                            determinaciones=estudios_ginecologicos_1,
+                                            medico=consulta.medico,
+                                            paciente=consulta.paciente,
+                                            acompañante="no")
+                if estudios_ginecologicos_2:
+                    for estudio_nombre in estudios_ginecologicos_2:
+                        ResultadoEstudio.objects.create(
+                            consulta=consulta,
+                            tipo_estudio="GINECOLOGICO",
+                            nombre_estudio=estudio_nombre,
+                        )
+                    generar_orden_y_guardar(consulta=consulta,
+                                            tipo_estudio="Estudios ginecológicos",
+                                            determinaciones=estudios_ginecologicos_2,
+                                            medico=consulta.medico,
+                                            paciente=consulta.paciente,
+                                            acompañante="si")
+                if nombre_estudios_preq_1:
+                    for estudio_nombre in nombre_estudios_preq_1:
+                        ResultadoEstudio.objects.create(
+                            consulta=consulta,
+                            tipo_estudio="PREQUIRURGICO",
+                            nombre_estudio=estudio_nombre,
+                        )
+                    generar_orden_y_guardar(consulta=consulta,
+                                            tipo_estudio="Estudios prequirúrgicos",
+                                            determinaciones=nombre_estudios_preq_1,
+                                            medico=consulta.medico,
+                                            paciente=consulta.paciente,
+                                            acompañante="no")
+                if nombre_estudios_preq_2:
+                    for estudio_nombre in nombre_estudios_preq_2:
+                        ResultadoEstudio.objects.create(
+                            consulta=consulta,
+                            tipo_estudio="PREQUIRURGICO",
+                            nombre_estudio=estudio_nombre,
+                        )
+                    generar_orden_y_guardar(consulta=consulta,
+                                            tipo_estudio="Estudios prequirúrgicos",
+                                            determinaciones=nombre_estudios_preq_2,
+                                            medico=consulta.medico,
+                                            paciente=consulta.paciente,
+                                            acompañante="si")
+                if estudios_semen:
+                    for estudio_nombre in estudios_semen:
+                        ResultadoEstudio.objects.create(
+                            consulta=consulta,
+                            tipo_estudio="SEMINAL",
+                            nombre_estudio=estudio_nombre,
+                        )
+                    generar_orden_y_guardar(consulta=consulta,
+                                            tipo_estudio="Estudios semen",
+                                            determinaciones=estudios_semen,
+                                            medico=consulta.medico,
+                                            paciente=consulta.paciente,
+                                            acompañante="si")
+                if estudios_hormonales_1:
+                    for estudio_nombre in estudios_hormonales_1:
+                        ResultadoEstudio.objects.create(
+                            consulta=consulta,
+                            tipo_estudio="HORMONAL",
+                            nombre_estudio=estudio_nombre,
+                        )
+                    generar_orden_y_guardar(consulta=consulta,
+                                            tipo_estudio="Estudios hormonales",
+                                            determinaciones=estudios_hormonales_1,
+                                            medico=consulta.medico,
+                                            paciente=consulta.paciente,
+                                            acompañante="no")
+                if estudios_hormonales_2:
+                    for estudio_nombre in estudios_hormonales_2:
+                        ResultadoEstudio.objects.create(
+                            consulta=consulta,
+                            tipo_estudio="HORMONAL",
+                            nombre_estudio=estudio_nombre,
+                        )
+                    generar_orden_y_guardar(consulta=consulta,
+                                            tipo_estudio="Estudios hormonales",
+                                            determinaciones=estudios_hormonales_2,
+                                            medico=consulta.medico,
+                                            paciente=consulta.paciente,
+                                            acompañante="si")
+
+
 
             logger.info(f"Primera consulta creada: {consulta.id}")
             return Response(

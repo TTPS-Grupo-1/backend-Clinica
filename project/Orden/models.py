@@ -1,5 +1,6 @@
 from django.db import models
 
+
 class Orden(models.Model):
     TIPO_ESTUDIO_CHOICES = [
         ("ginecologico", "Ginecológico"),
@@ -9,7 +10,7 @@ class Orden(models.Model):
     ]
 
     primera_consulta = models.ForeignKey(
-        "PrimeraConsulta",
+        "PrimerConsulta.PrimeraConsulta",
         on_delete=models.CASCADE,
         related_name="ordenes"
     )
