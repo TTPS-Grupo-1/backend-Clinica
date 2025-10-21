@@ -25,7 +25,7 @@ class CreateEmbrionMixin(APIView):
 		try:
 			with transaction.atomic():
 				embrion = serializer.save()
-				logger.info(f"Embrion creado: {embrion}")
+				logger.info(f"Embrion creado: {embrion.identificador}")
 				return Response({
 					"success": True,
 					"message": "Embrion registrado correctamente.",
