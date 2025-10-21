@@ -27,6 +27,13 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',  # o JWT si usás eso
+    ],
+}
+
+
 
 # Application definition
 
@@ -51,6 +58,8 @@ INSTALLED_APPS = [
     'Fertilizacion',
     'rest_framework.authtoken',
     'CustomUser',
+    'ResultadoEstudio',
+    'Orden',
 ]
 
 AUTH_USER_MODEL = 'CustomUser.CustomUser'
@@ -77,6 +86,7 @@ TEMPLATES = [
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
+                "django.template.context_processors.debug",
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
@@ -183,10 +193,29 @@ LOGGING = {
     },
 }
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Vite (React)
-    "http://localhost:3000",  # CRA
+
+
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+# Configuración de correo (ejemplo con Gmail)
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "gclinicafertilidademby@gmail.com"       # 🔹 remitente
+EMAIL_HOST_PASSWORD = "kkqt bnza grab psrz" # 🔹 usar App Password si usás Gmail
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 import os
 
