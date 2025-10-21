@@ -12,6 +12,9 @@ from ResultadoEstudio.models import ResultadoEstudio
 from Orden.models import Orden
 from Orden.orden_service import generar_orden_y_guardar
 import logging
+from Orden.orden_email_service import enviar_ordenes_por_email
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -378,6 +381,8 @@ class CreatePrimeraConsultaMixin:
                                             medico=consulta.medico,
                                             paciente=consulta.paciente,
                                             acompañante="si")
+                # Enviar órdenes por email al paciente
+                enviar_ordenes_por_email(consulta)
 
 
 

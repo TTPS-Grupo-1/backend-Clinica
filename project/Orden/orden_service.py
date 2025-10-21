@@ -5,7 +5,7 @@ import unicodedata
 from io import BytesIO
 from supabase import create_client
 from django.conf import settings
-from .models import Orden
+from Orden.models import Orden
 
 
 # ⚙️ Configuración Supabase (valores fijos por ahora)

@@ -86,6 +86,7 @@ TEMPLATES = [
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
+                "django.template.context_processors.debug",
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
@@ -206,6 +207,16 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+# Configuración de correo (ejemplo con Gmail)
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "gclinicafertilidademby@gmail.com"       # 🔹 remitente
+EMAIL_HOST_PASSWORD = "kkqt bnza grab psrz" # 🔹 usar App Password si usás Gmail
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
 import os
 
 MEDIA_URL = '/media/'
