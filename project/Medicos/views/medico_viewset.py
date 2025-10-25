@@ -14,7 +14,7 @@ class MedicoViewSet(viewsets.ModelViewSet):
     Usa el modelo CustomUser (rol='MEDICO').
     """
     serializer_class = CustomUserSerializer
-    lookup_field = 'id'
+    lookup_field = 'dni'
 
     # --------------------------------------------------------
     # 🔹 Obtener médicos (solo rol=MEDICO y no eliminados)

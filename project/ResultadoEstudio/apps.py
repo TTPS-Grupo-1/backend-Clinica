@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class ConsultaestudioConfig(AppConfig):
+class ResultadoEstudioConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'ConsultaEstudio'
+    name = 'ResultadoEstudio'

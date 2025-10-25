@@ -19,7 +19,8 @@ from django.urls import path, include
 from  Login.views import LoginAPIView, LogoutAPIView
 from django.conf import settings
 from django.conf.urls.static import static
-
+from integrations.almacenamiento_proxy import almacenamiento_proxy
+from integrations.turnos_proxy import turnos_proxy
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('Paciente.urls')),
@@ -32,6 +33,8 @@ urlpatterns = [
     path('api/login/', LoginAPIView.as_view(), name='login'),
     path('api/logout/', LogoutAPIView.as_view(), name='logout'),
     path('api/', include('Turnos.urls')),
+    path('api/almacenamiento/', almacenamiento_proxy),
+    path('api/turnos/', turnos_proxy),
 ]
 
 if settings.DEBUG:
