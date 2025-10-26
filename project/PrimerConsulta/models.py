@@ -16,6 +16,8 @@ class PrimeraConsulta(models.Model):
     )
 
     objetivo_consulta = models.TextField(null=True, blank=True)
+    antecedentes_clinicos_1 = models.JSONField(null=True, blank=True)
+    antecedentes_clinicos_2 = models.JSONField(null=True, blank=True)
 
     antecedentes_familiares_1 = models.TextField(null=True, blank=True)
     antecedentes_familiares_2 = models.TextField(null=True, blank=True)
