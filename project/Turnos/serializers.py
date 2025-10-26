@@ -1,26 +1,29 @@
-from rest_framework import serializers
-from Turnos.models import Turno
-from Medicos.models import Medico
+# Turnos/serializers.py
 
+from rest_framework import serializers
+from .models import Turno
+from CustomUser.models import CustomUser # 👈 Usamos CustomUser
 
 class TurnoSerializer(serializers.ModelSerializer):
-    
-    # Campo Medico (Se mantiene igual, la validación del médico es necesaria)
+    # 1. Campo Médico (Acepta 'medico' minúscula del JSON, mapea a FK 'Medico' mayúscula)
     medico = serializers.PrimaryKeyRelatedField(
-        queryset=Medico.objects.all(),
+        source='Medico', 
+        queryset=CustomUser.objects.filter(rol='MEDICO') 
     )
 
-    Paciente = serializers.IntegerField() 
+    # 2. Campo Paciente (Acepta 'Paciente' o 'paciente' del JSON, mapea a FK 'Paciente' mayúscula)
+    Paciente = serializers.PrimaryKeyRelatedField(
+        queryset=CustomUser.objects.filter(rol='PACIENTE') 
+    )
 
     class Meta:
         model = Turno
-        # El campo debe seguir la capitalización del modelo
+        # ⚠️ Debe usar los nombres de las variables declaradas: 'medico' y 'Paciente'
         fields = [
-            'medico',
-            'Paciente', 
-            'fecha_hora'
+            'id', 
+            'medico',       
+            'Paciente',     
+            'fecha_hora',
+            'motivo'
+            # 'estado' si quieres mostrarlo
         ]
-        # Indicamos a DRF que 'Paciente' no debe ser manejado como una relación
-        extra_kwargs = {
-            'Paciente': {'required': True}
-        }

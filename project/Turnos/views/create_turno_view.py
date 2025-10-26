@@ -4,25 +4,24 @@ from django.utils import timezone
 import logging
 from datetime import datetime
 
-# ⚠️ Asegúrate de que estas importaciones sean correctas
-from Turnos.models import Turno
-from Medicos.models import Medico
-from Paciente.models import Paciente # <--- ¡IMPORTACIÓN CLAVE!
+# ⚠️ La importación CLAVE: Usamos CustomUser en lugar de Medico/Paciente
+from Turnos.models import Turno 
+from CustomUser.models import CustomUser 
 
 logger = logging.getLogger(__name__)
 
 class CreateTurnoMixin:
     """
-    Mixin para manejar la creación de turnos.
-    Asegura la conversión de DNI/ID a instancias de objeto para las claves foráneas.
+    MixIn para manejar la creación de turnos.
+    Busca Médicos y Pacientes dentro del modelo CustomUser por DNI/ID y rol.
     """
 
     def create(self, request, *args, **kwargs):
         try:
             data = request.data.copy()
-            # print(f"Datos recibidos en el backend: {data}") # Se mantiene para diagnóstico
+            # print(f"Datos recibidos en el backend: {data}") # Mantener para diagnóstico
 
-            # --- 1. VALIDACIÓN DE EXISTENCIA Y OBTENCIÓN DE DATOS ---
+            # --- 1. VALIDACIÓN DE EXISTENCIA ---
             required_fields = ['medico', 'paciente', 'fecha', 'hora']
             for field in required_fields:
                 if not data.get(field):
@@ -32,24 +31,26 @@ class CreateTurnoMixin:
                     }, status=status.HTTP_400_BAD_REQUEST)
 
             dni_medico_value = data.get('medico')
-            paciente_id = data.get('paciente') # Obtiene el valor 1 (minúscula)
-
-            # --- 2. BÚSQUEDA DEL PACIENTE POR ID (Necesaria para obtener la instancia) ---
+            paciente_id = data.get('paciente') 
+            
+            # --- 2. BÚSQUEDA DEL PACIENTE POR ID Y ROL ---
             try:
-                paciente_obj = Paciente.objects.get(id=paciente_id)
-            except Paciente.DoesNotExist:
+                # Busca por ID y verifica el ROL
+                paciente_obj = CustomUser.objects.get(id=paciente_id, rol='PACIENTE')
+            except CustomUser.DoesNotExist:
                 return Response({
                     "success": False,
-                    "message": f"El paciente con ID {paciente_id} especificado no existe."
+                    "message": f"El paciente (ID: {paciente_id}) no existe o no tiene rol PACIENTE."
                 }, status=status.HTTP_404_NOT_FOUND)
 
-            # --- 3. BÚSQUEDA DEL MÉDICO POR DNI (PK) ---
+            # --- 3. BÚSQUEDA DEL MÉDICO POR DNI Y ROL ---
             try:
-                medico_obj = Medico.objects.get(dni=dni_medico_value) 
-            except Medico.DoesNotExist:
+                # Busca por DNI y verifica el ROL
+                medico_obj = CustomUser.objects.get(dni=dni_medico_value, rol='MEDICO') 
+            except CustomUser.DoesNotExist:
                 return Response({
                     "success": False,
-                    "message": f"El médico con DNI {dni_medico_value} especificado no existe."
+                    "message": f"El médico (DNI: {dni_medico_value}) no existe o no tiene rol MEDICO."
                 }, status=status.HTTP_404_NOT_FOUND)
             
             # --- 4. COMBINACIÓN DE FECHA, HORA Y VALIDACIÓN DE TIEMPO ---
@@ -65,18 +66,17 @@ class CreateTurnoMixin:
             
             # --- 5. PREPARACIÓN FINAL DE DATOS PARA EL SERIALIZER ---
             
-            # El Serializer de DRF acepta el OBJETO para claves foráneas.
+            # Asignar la instancia del objeto a la clave 'Paciente' (MAYÚSCULA)
             data['Paciente'] = paciente_obj 
             
-            # El Serializer acepta el valor PK para PrimaryKeyRelatedField (el DNI)
+            # Asignar la PK del médico (el DNI) a la clave 'medico' (MINÚSCULA)
             data['medico'] = medico_obj.dni 
             
             # Asignar la fecha combinada
             data['fecha_hora'] = fecha_hora_turno 
             
-            # Limpiar campos que no van al Serializer
-            if 'paciente' in data:
-                del data['paciente'] # Eliminar el ID en minúsculas
+            # Limpiar campos originales (minúsculas)
+            if 'paciente' in data: del data['paciente'] 
             del data['fecha']
             del data['hora']
             
@@ -105,4 +105,3 @@ class CreateTurnoMixin:
                 "success": False,
                 "message": f"Error al crear turno: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
