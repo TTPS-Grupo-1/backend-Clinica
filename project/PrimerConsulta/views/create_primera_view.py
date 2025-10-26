@@ -27,7 +27,7 @@ class CreatePrimeraConsultaMixin:
 
     def create(self, request, *args, **kwargs):
         payload = request.data
-
+        print("Payload recibido:", payload)
         # Helper to safely convert numeric-like strings to int or None
         def safe_int(v):
             try:
@@ -43,7 +43,17 @@ class CreatePrimeraConsultaMixin:
 
         # Obtener paciente y medico (buscar en payload o en form)
        # Obtener paciente y médico (admite *_id o relaciones)
+       
+
+# 🔹 Extraer el objetivo y desanidar si corresponde
+       # Obtener el form desde el payload
         form = payload.get('form', {}) if isinstance(payload, dict) else {}
+
+        # 🔹 Extraer el objetivo y desanidar si corresponde
+        objetivo = payload.get('objetivo')
+        if objetivo and isinstance(form.get(objetivo), dict):
+            form = form.get(objetivo)
+
 
         paciente_id = (
             payload.get('paciente_id')
@@ -125,7 +135,13 @@ class CreatePrimeraConsultaMixin:
             form.get('examen_fisico_mujer') or form.get('examen_fisico_hombre') or form.get('examen_fisico') or form.get('examen_fisico_mujer1') or None
         )
         consulta_data['examen_fisico_2'] = form.get('examen_fisico_mujer2') or form.get('examen_fisico_hombre') or None
-
+        antecedentes_clinicos_1 = form.get('clinicos') or form.get('clinicos_mujer1') or form.get('clinicos_mujer') or None
+        antecedentes_clinicos_2 = form.get('clinicos_mujer2') or form.get('clinicos_hombre') or None
+        print("Antecedentes clínicos 1:", antecedentes_clinicos_1)
+        print("Antecedentes clínicos 2:", antecedentes_clinicos_2)
+        consulta_data['antecedentes_clinicos_1'] = antecedentes_clinicos_1
+        consulta_data['antecedentes_clinicos_2'] = antecedentes_clinicos_2
+        print("Datos normalizados para PrimeraConsulta:", consulta_data)
         serializer = self.get_serializer(data=consulta_data)
 
         if not serializer.is_valid():
@@ -267,6 +283,9 @@ class CreatePrimeraConsultaMixin:
         
         estudios_hormonales_1 = form.get('hormonales', {}).get('seleccionados') or form.get('hormonales_mujer1', {}).get('seleccionados') or None
         estudios_hormonales_2 = form.get('hormonales_mujer2', {}).get('seleccionados') or form.get('hormonales_hombre', {}).get('seleccionados') or None
+        
+        
+        
         # Crear todo en una transacción para mantener consistencia
         try:
             with transaction.atomic():
@@ -289,7 +308,7 @@ class CreatePrimeraConsultaMixin:
                     
                 if fenotipo_payload and any(v not in [None, ""] for v in fenotipo_payload.values()):
                     Fenotipo.objects.create(consulta=consulta, **fenotipo_payload)
-                    
+                
                 if estudios_ginecologicos_1:
                     for estudio_nombre in estudios_ginecologicos_1:
                         ResultadoEstudio.objects.create(
@@ -298,7 +317,7 @@ class CreatePrimeraConsultaMixin:
                             nombre_estudio=estudio_nombre,
                         )
                     generar_orden_y_guardar(consulta=consulta,
-                                            tipo_estudio="Estudios ginecológicos",
+                                            tipo_estudio="estudios_ginecologicos",
                                             determinaciones=estudios_ginecologicos_1,
                                             medico=consulta.medico,
                                             paciente=consulta.paciente,
@@ -311,7 +330,7 @@ class CreatePrimeraConsultaMixin:
                             nombre_estudio=estudio_nombre,
                         )
                     generar_orden_y_guardar(consulta=consulta,
-                                            tipo_estudio="Estudios ginecológicos",
+                                            tipo_estudio="estudios_ginecologicos",
                                             determinaciones=estudios_ginecologicos_2,
                                             medico=consulta.medico,
                                             paciente=consulta.paciente,
@@ -324,7 +343,7 @@ class CreatePrimeraConsultaMixin:
                             nombre_estudio=estudio_nombre,
                         )
                     generar_orden_y_guardar(consulta=consulta,
-                                            tipo_estudio="Estudios prequirúrgicos",
+                                            tipo_estudio="estudios_prequirurgicos",
                                             determinaciones=nombre_estudios_preq_1,
                                             medico=consulta.medico,
                                             paciente=consulta.paciente,
@@ -337,7 +356,7 @@ class CreatePrimeraConsultaMixin:
                             nombre_estudio=estudio_nombre,
                         )
                     generar_orden_y_guardar(consulta=consulta,
-                                            tipo_estudio="Estudios prequirúrgicos",
+                                            tipo_estudio="estudios_prequirurgicos",
                                             determinaciones=nombre_estudios_preq_2,
                                             medico=consulta.medico,
                                             paciente=consulta.paciente,
@@ -350,7 +369,7 @@ class CreatePrimeraConsultaMixin:
                             nombre_estudio=estudio_nombre,
                         )
                     generar_orden_y_guardar(consulta=consulta,
-                                            tipo_estudio="Estudios semen",
+                                            tipo_estudio="estudios_semen",
                                             determinaciones=estudios_semen,
                                             medico=consulta.medico,
                                             paciente=consulta.paciente,
@@ -363,7 +382,7 @@ class CreatePrimeraConsultaMixin:
                             nombre_estudio=estudio_nombre,
                         )
                     generar_orden_y_guardar(consulta=consulta,
-                                            tipo_estudio="Estudios hormonales",
+                                            tipo_estudio="estudios_hormonales",
                                             determinaciones=estudios_hormonales_1,
                                             medico=consulta.medico,
                                             paciente=consulta.paciente,
@@ -376,7 +395,7 @@ class CreatePrimeraConsultaMixin:
                             nombre_estudio=estudio_nombre,
                         )
                     generar_orden_y_guardar(consulta=consulta,
-                                            tipo_estudio="Estudios hormonales",
+                                            tipo_estudio="estudios_hormonales",
                                             determinaciones=estudios_hormonales_2,
                                             medico=consulta.medico,
                                             paciente=consulta.paciente,
