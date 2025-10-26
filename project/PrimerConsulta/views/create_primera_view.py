@@ -13,6 +13,7 @@ from Orden.models import Orden
 from Orden.orden_service import generar_orden_y_guardar
 import logging
 from Orden.orden_email_service import enviar_ordenes_por_email
+from .generar_orden_pago import registrar_orden_pago
 
 
 
@@ -402,6 +403,13 @@ class CreatePrimeraConsultaMixin:
                                             acompañante="si")
                 # Enviar órdenes por email al paciente
                 enviar_ordenes_por_email(consulta)
+                print("Paciente obra social:", consulta.paciente.obra_social)
+                print("Datos de la orden de pago:")
+                print("Grupo:", 1)
+                print("ID Paciente:", consulta.paciente.id)
+                print("Monto:", 10000.0)
+                registrar_orden_pago(consulta.paciente.id, consulta.paciente.obra_social, 1, 10000.0)
+                
 
 
 

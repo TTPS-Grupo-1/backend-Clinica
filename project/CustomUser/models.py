@@ -75,7 +75,7 @@ class CustomUser(AbstractUser):
     # ---------------------------------------------------------
     # Campos para PACIENTES
     fecha_nacimiento = models.DateField(null=True, blank=True)
-    obra_social = models.CharField(max_length=100, blank=True, null=True)
+    obra_social = models.BigIntegerField(blank=True, null=True)
     numero_afiliado = models.CharField(max_length=50, blank=True, null=True)
     sexo = models.CharField(
         max_length=10,
