@@ -21,6 +21,8 @@ from django.conf import settings
 from django.conf.urls.static import static
 from integrations.almacenamiento_proxy import almacenamiento_proxy
 from integrations.turnos_proxy import turnos_proxy_get, turnos_proxy_post, turnos_proxy_get_medico_fecha, turnos_proxy_reservar
+from integrations.almacenamiento_reserva_proxy import almacenamiento_reserva_proxy
+from integrations.gametos_donacion_proxy import gametos_donacion_proxy
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('Paciente.urls')),
@@ -39,6 +41,8 @@ urlpatterns = [
     path('api/turnos/consultar_medico_fecha/', turnos_proxy_get_medico_fecha, name='turnos_proxy_get_medico_fecha'),
     path('api/turnos/grilla/', turnos_proxy_post, name='turnos_post_proxy'),
     path('api/reservar_turno/', turnos_proxy_reservar, name='turnos_proxy_reservar'),
+    path('api/donacion/', gametos_donacion_proxy),
+    path('api/tanques/registrar/', almacenamiento_reserva_proxy),
 ]
 
 if settings.DEBUG:
