@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'CustomUser',
     'ResultadoEstudio',
     'Orden',
+    'Monitoreo',
 ]
 
 AUTH_USER_MODEL = 'CustomUser.CustomUser'
