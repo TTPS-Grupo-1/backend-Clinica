@@ -1,11 +1,3 @@
-#django
-#djangorestframework
-#Django==5.2.7
-#django-cors-headers==4.9.0
-#djangorestframework==3.16.1
-#pillow==12.0.0
-#sqlparse==0.5.3
-#supabase==2.5.0
 annotated-types==0.7.0
 anyio==4.11.0
 asgiref==3.10.0
@@ -15,6 +7,7 @@ deprecation==2.1.0
 Django==5.2.7
 django-cors-headers==4.9.0
 djangorestframework==3.16.1
+dotenv==0.9.9
 gotrue==2.12.4
 h11==0.16.0
 h2==4.3.0
@@ -30,6 +23,7 @@ pydantic==2.12.3
 pydantic_core==2.41.4
 PyJWT==2.10.1
 python-dateutil==2.9.0.post0
+python-dotenv==1.0.0
 realtime==1.0.6
 requests==2.32.5
 six==1.17.0

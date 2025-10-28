@@ -64,8 +64,7 @@ class LoginAPIView(APIView):
                 "dni": user.dni,
                 "telefono": user.telefono,
                 "rol": user.rol,
-                "is_staff": user.is_staff,
-                "is_superuser": user.is_superuser,
+                "gender": user.sexo,
             }
         }, status=status.HTTP_200_OK)
 
