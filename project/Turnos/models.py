@@ -25,6 +25,10 @@ class Turno(models.Model):
     
     created_at = models.DateTimeField(auto_now_add=True)
 
+    cancelado = models.BooleanField(default=False, help_text="Indica si el turno fue cancelado por el paciente o la clínica.")
+    atendido = models.BooleanField(default=False, help_text="Indica si el turno ya fue completado y atendido por el médico.")
+    id_externo = models.IntegerField(unique=True, help_text="ID único del turno en la API externa (Supabase).")
+
     class Meta:
         db_table = 'turno'
         ordering = ['fecha_hora']

@@ -20,7 +20,7 @@ from  Login.views import LoginAPIView, LogoutAPIView
 from django.conf import settings
 from django.conf.urls.static import static
 from integrations.almacenamiento_proxy import almacenamiento_proxy
-from integrations.turnos_proxy import turnos_proxy_get, turnos_proxy_post, turnos_proxy_get_medico_fecha, turnos_proxy_reservar
+from integrations.turnos_proxy import turnos_proxy_get, turnos_proxy_post, turnos_proxy_get_medico_fecha, turnos_proxy_reservar, turnos_proxy_get_turnos_paciente, turnos_proxy_cancelar
 from integrations.almacenamiento_reserva_proxy import almacenamiento_reserva_proxy
 from integrations.gametos_donacion_proxy import gametos_donacion_proxy
 urlpatterns = [
@@ -43,6 +43,8 @@ urlpatterns = [
     path('api/reservar_turno/', turnos_proxy_reservar, name='turnos_proxy_reservar'),
     path('api/donacion/', gametos_donacion_proxy),
     path('api/tanques/registrar/', almacenamiento_reserva_proxy),
+    path('api/turnos/mis_turnos/', turnos_proxy_get_turnos_paciente, name='turnos_proxy_get_turnos_paciente'),
+    path('api/turnos/cancelar_turno/', turnos_proxy_cancelar, name='turnos_proxy_cancelar'),
 ]
 
 if settings.DEBUG:
