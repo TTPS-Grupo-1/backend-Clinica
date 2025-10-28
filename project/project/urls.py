@@ -43,6 +43,7 @@ urlpatterns = [
     path('api/reservar_turno/', turnos_proxy_reservar, name='turnos_proxy_reservar'),
     path('api/donacion/', gametos_donacion_proxy),
     path('api/tanques/registrar/', almacenamiento_reserva_proxy),
+    path('api/chatbot/', include('Chatbot.urls')),
 ]
 
 if settings.DEBUG:
