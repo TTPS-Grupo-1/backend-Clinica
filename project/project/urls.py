@@ -45,6 +45,7 @@ urlpatterns = [
     path('api/donacion/', gametos_donacion_proxy),
     path('api/tanques/registrar/', almacenamiento_reserva_proxy),
     path('api/monitoreo/', include('Monitoreo.urls')),
+    path('api/segunda_consulta/', include('SegundaConsulta.urls')),
 ]
 
 if settings.DEBUG:
