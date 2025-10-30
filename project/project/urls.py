@@ -23,6 +23,7 @@ from integrations.almacenamiento_proxy import almacenamiento_proxy
 from integrations.turnos_proxy import turnos_proxy_get, turnos_proxy_post, turnos_proxy_get_medico_fecha, turnos_proxy_reservar, turnos_proxy_get_turnos_paciente, turnos_proxy_cancelar
 from integrations.almacenamiento_reserva_proxy import almacenamiento_reserva_proxy
 from integrations.gametos_donacion_proxy import gametos_donacion_proxy
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('Paciente.urls')),
@@ -45,6 +46,8 @@ urlpatterns = [
     path('api/tanques/registrar/', almacenamiento_reserva_proxy),
     path('api/turnos/mis_turnos/', turnos_proxy_get_turnos_paciente, name='turnos_proxy_get_turnos_paciente'),
     path('api/turnos/cancelar_turno/', turnos_proxy_cancelar, name='turnos_proxy_cancelar'),
+    path('api/monitoreo/', include('Monitoreo.urls')),
+    path('api/chatbot/', include('Chatbot.urls')),
 ]
 
 if settings.DEBUG:
