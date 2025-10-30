@@ -161,6 +161,7 @@ def turnos_proxy_reservar(request):
             medico_pk_value = turno_externo['id_medico'] 
             paciente_id_value = turno_externo['id_paciente']
             fecha_hora_str = turno_externo['fecha_hora']
+            id_turno_externo = turno_externo['id']
             
             try:
                 with transaction.atomic():
@@ -179,6 +180,7 @@ def turnos_proxy_reservar(request):
                         Paciente=paciente_instance, 
                         Medico=medico_instance,
                         fecha_hora=fecha_hora_dt,
+                        id_externo=id_turno_externo,
                         # No incluimos 'estado' ni 'id'/'created_at' porque son automáticos
                     )
                 
