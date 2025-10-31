@@ -48,6 +48,8 @@ urlpatterns = [
     path('api/turnos/cancelar_turno/', turnos_proxy_cancelar, name='turnos_proxy_cancelar'),
     path('api/monitoreo/', include('Monitoreo.urls')),
     path('api/chatbot/', include('Chatbot.urls')),
+    path('api/tratamiento/', include('Tratamiento.urls')),
+    path('api/transferencia/', include('Transferencia.urls')),
 ]
 
 if settings.DEBUG:

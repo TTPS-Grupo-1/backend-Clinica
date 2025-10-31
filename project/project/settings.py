@@ -68,6 +68,8 @@ INSTALLED_APPS = [
     'Orden',
     'Monitoreo',
     'Chatbot',
+    'Tratamiento',
+    'Transferencia',
 ]
 
 AUTH_USER_MODEL = 'CustomUser.CustomUser'
