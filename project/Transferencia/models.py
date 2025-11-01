@@ -1,13 +1,13 @@
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from Tratamiento.models import Tratamiento
+
 
 
 class Transferencia(models.Model):
     """Representa una transferencia embrionaria asociada a un único tratamiento y a varios embriones."""
     tratamiento = models.ForeignKey(
-        Tratamiento,
+       'Tratamiento.Tratamiento',
         on_delete=models.CASCADE,
         related_name='transferencias'
     )

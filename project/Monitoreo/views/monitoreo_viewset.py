@@ -3,8 +3,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import action
 import logging
+from datetime import datetime
 from ..models import Monitoreo
 from ..serializers import MonitoreoSerializer
+from Tratamiento.models import Tratamiento
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +21,9 @@ class MonitoreoViewSet(viewsets.ModelViewSet):
         """
         Filtra monitoreos opcionalmente por tratamiento, paciente o estado
         """
-        queryset = Monitoreo.objects.all()
+        queryset = Monitoreo.objects.select_related('tratamiento', 'tratamiento__paciente', 'tratamiento__medico')
         
-        # Filtrar por tratamiento si viene en query params
+        # Filtrar por tratamiento
         tratamiento_id = self.request.query_params.get('tratamiento', None)
         if tratamiento_id:
             queryset = queryset.filter(tratamiento_id=tratamiento_id)
@@ -31,18 +33,61 @@ class MonitoreoViewSet(viewsets.ModelViewSet):
         if atendido is not None:
             queryset = queryset.filter(atendido=atendido.lower() == 'true')
         
-        # Filtrar por paciente (cuando exista Tratamiento)
-        # paciente_dni = self.request.query_params.get('paciente', None)
-        # if paciente_dni:
-        #     queryset = queryset.filter(tratamiento__paciente__dni=paciente_dni)
+        # Filtrar por paciente
+        paciente_dni = self.request.query_params.get('paciente', None)
+        if paciente_dni:
+            queryset = queryset.filter(tratamiento__paciente__dni=paciente_dni)
+        
+        # ✅ NUEVO: Filtrar por rango de fechas de atención
+        fecha_desde = self.request.query_params.get('fecha_desde', None)
+        fecha_hasta = self.request.query_params.get('fecha_hasta', None)
+        
+        if fecha_desde:
+            queryset = queryset.filter(fecha_atencion__gte=fecha_desde)
+        if fecha_hasta:
+            queryset = queryset.filter(fecha_atencion__lte=fecha_hasta)
         
         return queryset.order_by('-fecha_creacion')
     
     def create(self, request, *args, **kwargs):
         """
-        Personaliza la creación de monitoreos
+        Crea un monitoreo asociado a un tratamiento.
+        El paciente y médico se obtienen automáticamente del tratamiento.
         """
         logger.info(f"📥 Datos recibidos: {request.data}")
+        
+        # Validar que venga el tratamiento
+        tratamiento_id = request.data.get('tratamiento')
+        if not tratamiento_id:
+            logger.error("❌ No se proporcionó el ID del tratamiento")
+            return Response({
+                "success": False,
+                "message": "El ID del tratamiento es requerido",
+                "errors": {"tratamiento": ["Este campo es requerido"]}
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validar que existe el tratamiento
+        try:
+            tratamiento = Tratamiento.objects.get(id=tratamiento_id)
+            
+            if not tratamiento.paciente:
+                return Response({
+                    "success": False,
+                    "message": "El tratamiento no tiene un paciente asignado"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not tratamiento.medico:
+                return Response({
+                    "success": False,
+                    "message": "El tratamiento no tiene un médico asignado"
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Tratamiento.DoesNotExist:
+            logger.error(f"❌ No existe tratamiento con ID {tratamiento_id}")
+            return Response({
+                "success": False,
+                "message": f"No existe un tratamiento con ID {tratamiento_id}"
+            }, status=status.HTTP_404_NOT_FOUND)
         
         serializer = self.get_serializer(data=request.data)
         
@@ -55,7 +100,13 @@ class MonitoreoViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_400_BAD_REQUEST)
         
         self.perform_create(serializer)
-        logger.info(f"✅ Monitoreo creado: {serializer.data}")
+        
+        logger.info(f"✅ Monitoreo creado exitosamente")
+        logger.info(f"   - Tratamiento ID: {tratamiento_id}")
+        logger.info(f"   - Paciente: {tratamiento.paciente.first_name} {tratamiento.paciente.last_name}")
+        logger.info(f"   - Médico: {tratamiento.medico.first_name} {tratamiento.medico.last_name}")
+        if serializer.data.get('fecha_atencion'):
+            logger.info(f"   - Fecha de atención programada: {serializer.data['fecha_atencion']}")
         
         return Response({
             "success": True,
@@ -65,7 +116,7 @@ class MonitoreoViewSet(viewsets.ModelViewSet):
     
     def update(self, request, *args, **kwargs):
         """
-        Personaliza la actualización de monitoreos
+        Actualiza un monitoreo
         """
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
@@ -131,19 +182,37 @@ class MonitoreoViewSet(viewsets.ModelViewSet):
         """
         Obtiene todos los monitoreos de un paciente específico
         GET /api/monitoreo/monitoreos/por-paciente/12345678/
-        
-        👉 Descomentar cuando exista Tratamiento
         """
-        # monitoreos = self.get_queryset().filter(
-        #     tratamiento__paciente__dni=paciente_dni
-        # )
-        
-        # 👇 Por ahora devuelve lista vacía
-        monitoreos = []
+        monitoreos = self.get_queryset().filter(
+            tratamiento__paciente__dni=paciente_dni
+        )
         
         serializer = self.get_serializer(monitoreos, many=True)
         return Response({
             "success": True,
-            "count": len(monitoreos),
+            "count": monitoreos.count(),
+            "data": serializer.data
+        })
+    
+    # ✅ NUEVO: Endpoint para obtener monitoreos próximos a atender
+    @action(detail=False, methods=['get'], url_path='proximos')
+    def proximos(self, request):
+        """
+        Obtiene monitoreos con fecha de atención próxima (no atendidos)
+        GET /api/monitoreo/monitoreos/proximos/
+        """
+        from django.utils import timezone
+        
+        monitoreos = self.get_queryset().filter(
+            atendido=False,
+            fecha_atencion__isnull=False,
+            fecha_atencion__gte=timezone.now()
+        ).order_by('fecha_atencion')
+        
+        serializer = self.get_serializer(monitoreos, many=True)
+        
+        return Response({
+            "success": True,
+            "count": monitoreos.count(),
             "data": serializer.data
         })

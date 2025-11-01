@@ -1,27 +1,54 @@
 from django.db import models
-from CustomUser.models import CustomUser
 
 
 # Create your models here.
 class Monitoreo(models.Model):
-    descripcion = models.CharField(max_length=500, help_text="Descripción del monitoreo")
-    fecha_creacion = models.DateTimeField(auto_now_add=True, help_text="Fecha de creación del monitoreo")
-    fecha_atencion = models.DateTimeField(auto_now=True, help_text="Fecha de atención del monitoreo")
-    atendido = models.BooleanField(default=False, help_text="Indica si el monitoreo ha sido atendido")
+    """
+    Modelo para registrar monitoreos de tratamientos.
+    Se relaciona con Tratamiento, de donde se obtiene paciente y médico.
+    """
+    descripcion = models.CharField(
+        max_length=500, 
+        help_text="Descripción del monitoreo"
+    )
     
     tratamiento = models.ForeignKey(
-        'Tratamiento.Tratamiento',  # 👈 Cuando tus compañeros creen la app
+        'Tratamiento.Tratamiento',
         on_delete=models.CASCADE,
-        related_name='monitoreos',
+        related_name='lista_monitoreos',
         help_text="Tratamiento al que pertenece este monitoreo",
-        null=True,  # 👈 Temporal mientras no exista Tratamiento
-        blank=True  # 👈 Temporal mientras no exista Tratamiento
+        null=True,  # ✅ CAMBIO: Permitir null temporalmente
+        blank=True
     )
-
+    
+    atendido = models.BooleanField(
+        default=False,
+        help_text="Indica si el monitoreo ya fue atendido"
+    )
+    
+    fecha_creacion = models.DateTimeField(
+        auto_now_add=True, 
+        help_text="Fecha de creación del monitoreo"
+    )
+    
+    # ✅ CAMBIO: Fecha manual del turno donde se atenderá
+    fecha_atencion = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Fecha y hora del turno en que se atenderá este monitoreo"
+    )
+    
+    class Meta:
+        verbose_name = "Monitoreo"
+        verbose_name_plural = "Monitoreos"
+        ordering = ['-fecha_creacion']
+    
     def __str__(self):
-        return f"Monitoreo {self.id} - Paciente: {self.paciente.first_name} {self.paciente.last_name} - Médico: {self.medico.first_name} {self.medico.last_name}"
-
-
+        if self.tratamiento and self.paciente:
+            estado = "Atendido" if self.atendido else "Pendiente"
+            return f"Monitoreo {self.id} - {self.paciente.first_name} {self.paciente.last_name} - {estado}"
+        return f"Monitoreo {self.id}"
+    
     @property
     def paciente(self):
         """Obtiene el paciente desde el tratamiento"""
@@ -31,3 +58,13 @@ class Monitoreo(models.Model):
     def medico(self):
         """Obtiene el médico desde el tratamiento"""
         return self.tratamiento.medico if self.tratamiento else None
+    
+    @property
+    def turno(self):
+        """
+        Obtiene el turno asociado a este monitoreo (si existe)
+        Esto permite acceder al turno donde se atenderá el monitoreo
+        """
+        # TODO: Cuando exista la relación con Turno, implementar esto
+        # return self.tratamiento.turnos.filter(fecha=self.fecha_atencion).first()
+        return None
