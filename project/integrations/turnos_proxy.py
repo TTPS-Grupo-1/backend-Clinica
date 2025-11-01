@@ -34,6 +34,8 @@ from CustomUser.models import CustomUser
 from django.db import transaction
 import logging
 
+logger = logging.getLogger(__name__)
+
 # URL base para los endpoints de Supabase
 API_BASE_URL = "https://ahlnfxipnieoihruewaj.supabase.co/functions/v1"
 # Token de ejemplo fijo (usado para desarrollo/proxy)
@@ -159,6 +161,7 @@ def turnos_proxy_reservar(request):
             medico_pk_value = turno_externo['id_medico'] 
             paciente_id_value = turno_externo['id_paciente']
             fecha_hora_str = turno_externo['fecha_hora']
+            id_turno_externo = turno_externo['id']
             
             try:
                 with transaction.atomic():
@@ -177,6 +180,7 @@ def turnos_proxy_reservar(request):
                         Paciente=paciente_instance, 
                         Medico=medico_instance,
                         fecha_hora=fecha_hora_dt,
+                        id_externo=id_turno_externo,
                         # No incluimos 'estado' ni 'id'/'created_at' porque son automáticos
                     )
                 
@@ -186,13 +190,13 @@ def turnos_proxy_reservar(request):
             except (CustomUser.DoesNotExist, ValueError) as e:
                 # Captura si el usuario no existe o si el formato de fecha falla
                 error_msg = f"Error de réplica local: Usuario no encontrado o formato de fecha inválido. Detalle: {str(e)}"
-                logging.error(error_msg)
+                logger.error(error_msg)
                 return JsonResponse({"success": False, "error": error_msg}, status=500)
             
             except Exception as e:
                 # Captura cualquier otro error de guardado (ej: integridad DB)
                 error_msg = f"Error crítico al guardar turno localmente: {str(e)}"
-                logging.error(error_msg)
+                logger.info.error(error_msg)
                 return JsonResponse({"success": False, "error": error_msg}, status=500)
 
 
@@ -204,3 +208,103 @@ def turnos_proxy_reservar(request):
     except Exception as e:
         # Error al parsear el JSON de entrada o error interno del proxy
         return JsonResponse({"success": False, "error": f"Error interno del servidor: {str(e)}"}, status=500)
+   
+# -------------------------------------------------------------------------------------------
+# 5. Proxy para GET /get_turnos_paciente (Lista todos los turnos asignados a un paciente).
+# -------------------------------------------------------------------------------------------
+@csrf_exempt
+def turnos_proxy_get_turnos_paciente(request):
+
+    if request.method != 'GET':
+        return JsonResponse({"success": False, "error": "Método no permitido. Use GET."}, status=405)
+
+    # 1. Obtener el ID del paciente del frontend
+    id_paciente = request.GET.get('id_paciente')
+
+    if not id_paciente:
+        return JsonResponse({
+            "success": False, 
+            "error": "Falta el parámetro requerido: id_paciente."
+        }, status=400)
+
+    # 2. Configurar Autenticación
+    token = request.headers.get('Authorization', AUTH_TOKEN)
+    
+    # 3. Construir la URL para get_turnos_paciente
+    # 🚨 NOTA CLAVE: Usamos el endpoint '/get_turnos_paciente'
+    url = f"{API_BASE_URL}/get_turnos_paciente?id_paciente={id_paciente}"
+    
+    headers = {
+        "Authorization": token,
+        "Content-Type": "application/json",
+    }
+    
+    # 4. Ejecutar Petición
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        # Devolver la respuesta de la API externa (incluyendo 200 OK y errores 400)
+        return JsonResponse(resp.json(), status=resp.status_code, safe=False)
+        
+    except requests.exceptions.RequestException as e:
+        return JsonResponse({"success": False, "error": f"Error de conexión con la API externa: {str(e)}"}, status=502)
+    except Exception as e:
+        return JsonResponse({"success": False, "error": f"Error interno del proxy: {str(e)}"}, status=500)
+
+# ---------------------------------------------------------------------------------------------------
+# 6. Proxy para PATCH /cancelar_turno (Libera el turno en la API y marca el turno cancelado local.).
+# ---------------------------------------------------------------------------------------------------
+@csrf_exempt
+def turnos_proxy_cancelar(request):
+
+    if request.method != 'PATCH':
+        return JsonResponse({"success": False, "error": "Método no permitido. Use PATCH."}, status=405)
+
+    token = request.headers.get('Authorization', AUTH_TOKEN)
+    
+    try:
+
+        id_turno_ext = request.GET.get('id_turno')
+
+        logger.info(f"ID API EXTERNO {id_turno_ext}")
+  
+        if not id_turno_ext:
+            return JsonResponse({"success": False, "error": "Falta el parámetro id_turno en la URL."}, status=400)
+
+        # --- LÓGICA DE BÚSQUEDA DEL ID EXTERNO Y ACTUALIZACIÓN LOCAL ---
+        try:
+            with transaction.atomic():
+                
+                # 2. Obtener el ID externo para la API
+                turno_local = Turno.objects.get(id_externo=id_turno_ext)
+                logger.info(f"ID LOCAL {turno_local}")
+                # 3. EJECUTAR PATCH EN LA API EXTERNA
+                # El endpoint de cancelación usa Query Params: /cancelar_turno?id_turno={id_externo}
+                url_externa = f"{API_BASE_URL}/cancelar_turno?id_turno={id_turno_ext}"
+                headers = {"Authorization": token, "Content-Type": "application/json"}
+                
+                resp = requests.patch(url_externa, headers=headers, timeout=10)
+                resp_data = resp.json()
+
+                # 4. VERIFICAR RESPUESTA EXITOSA (200 OK)
+                if resp.status_code == 200:
+                    
+                    # 5. Marcar como cancelado en la BD local de Django
+                    turno_local.cancelado = True 
+                    turno_local.save()
+                    
+                    return JsonResponse(resp_data, status=200)
+
+                # 6. Si la API externa falla, devolver el error de Supabase/API
+                return JsonResponse(resp_data, status=resp.status_code)
+
+        except Turno.DoesNotExist:
+            return JsonResponse({"success": False, "error": f"El turno local con ID {id_turno_ext} no fue encontrado."}, status=404)
+        
+        except Exception as e:
+            # Captura errores de conexión, DB local, etc.
+            return JsonResponse({"success": False, "error": f"Error interno al cancelar: {str(e)}"}, status=500)
+
+    except json.JSONDecodeError:
+        return JsonResponse({"success": False, "error": "Cuerpo de petición JSON inválido."}, status=400)
+    except Exception as e:
+        return JsonResponse({"success": False, "error": f"Error interno del proxy: {str(e)}"}, status=500)
