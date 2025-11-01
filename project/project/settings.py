@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     'Chatbot',
     'Tratamiento',
     'Transferencia',
+    'seed_data',  # ✅ Agregar al final
 ]
 
 AUTH_USER_MODEL = 'CustomUser.CustomUser'
