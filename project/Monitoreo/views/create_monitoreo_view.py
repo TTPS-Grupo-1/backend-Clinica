@@ -1,47 +1,34 @@
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.views import APIView
+from rest_framework.views import APIView  # 👈 Agrega esta importación
+import logging
 from django.db import IntegrityError, transaction
 from Monitoreo.models import Monitoreo
 from Monitoreo.serializers import MonitoreoSerializer
-import logging
 
 logger = logging.getLogger(__name__)
 
-class CreateMonitoreoMixin(APIView):
+class CreateMonitoreoMixin:
 	"""
-	Vista para crear un monitoreo.
+	Mixin para personalizar la creación de monitoreos
 	"""
-	def post(self, request):
-		serializer = MonitoreoSerializer(data=request.data)
-		if not serializer.is_valid():
-			logger.warning(f"Errores de validación: {serializer.errors}")
-			return Response({
-				"success": False,
-				"message": "Hay errores en los campos ingresados.",
-				"errors": serializer.errors
-			}, status=status.HTTP_400_BAD_REQUEST)
-		try:
-			with transaction.atomic():
-				monitoreo = serializer.save()
-				logger.info(f"Monitoreo creado: {monitoreo.id}")
-				return Response({
-					"success": True,
-					"message": "Monitoreo registrado correctamente.",
-					"data": serializer.data
-				}, status=status.HTTP_201_CREATED)
-		except IntegrityError as e:
-			logger.error(f"Error de integridad: {str(e)}")
-			return Response({
-				"success": False,
-				"message": "El monitoreo ya existe o hay un campo duplicado."
-			}, status=status.HTTP_400_BAD_REQUEST)
-		except Exception as e:
-			logger.exception("Error inesperado al crear monitoreo.")
-			return Response({
-				"success": False,
-				"message": "Ocurrió un error al registrar el monitoreo."
-			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+	
+	def perform_create(self, serializer):
+		"""
+		Lógica adicional al crear un monitoreo
+		"""
+		logger.info(f"📝 Creando nuevo monitoreo...")
+		
+		monitoreo = serializer.save()
+		
+		# TODO: Cuando exista Tratamiento, puedes agregar notificaciones
+		# if monitoreo.tratamiento and monitoreo.medico:
+		#     enviar_notificacion_medico(monitoreo.medico, monitoreo)
+		
+		logger.info(f"✅ Monitoreo {monitoreo.id} creado exitosamente")
+		
+		return monitoreo
+
 
 class UpdateMonitoreoMixin(APIView):
 	"""
