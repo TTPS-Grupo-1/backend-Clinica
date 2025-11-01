@@ -2,8 +2,9 @@ from django.db import models
 from CustomUser.models import CustomUser
 from Monitoreo.models import Monitoreo
 from PrimerConsulta.models import PrimeraConsulta
-
-
+from Transferencia.models import Transferencia
+from Puncion.models import Puncion
+from Turnos.models import Turno
 class Tratamiento(models.Model):
     """
     Modelo que representa un tratamiento de fertilidad asignado a un paciente.
@@ -36,14 +37,11 @@ class Tratamiento(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_modificacion = models.DateTimeField(auto_now=True)
 
-    # New nullable foreign keys
-    monitoreo = models.ForeignKey(
+    # Relación ManyToMany con Monitoreos
+    monitoreos = models.ManyToManyField(
         Monitoreo,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
         related_name='tratamientos',
-        help_text="Monitoreo asociado al tratamiento"
+        help_text="Monitoreos asociados a este tratamiento"
     )
     primera_consulta = models.ForeignKey(
         PrimeraConsulta,
@@ -52,6 +50,29 @@ class Tratamiento(models.Model):
         blank=True,
         related_name='tratamientos',
         help_text="Primera consulta asociada al tratamiento"
+    )
+    transferencia = models.ForeignKey(
+        Transferencia,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='transferencias',
+        help_text="Transferencia asociada al tratamiento"
+    )
+    puncion = models.ForeignKey(
+        Puncion,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='punciones',
+        help_text="Punción asociada al tratamiento"
+    )
+
+    # Relación ManyToMany con Turnos
+    turnos = models.ManyToManyField(
+        Turno,
+        related_name='tratamientos',
+        help_text="Turnos asociados a este tratamiento"
     )
 
     class Meta:
