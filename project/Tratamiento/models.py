@@ -37,12 +37,7 @@ class Tratamiento(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_modificacion = models.DateTimeField(auto_now=True)
 
-    # Relación ManyToMany con Monitoreos
-    monitoreos = models.ManyToManyField(
-        Monitoreo,
-        related_name='tratamientos',
-        help_text="Monitoreos asociados a este tratamiento"
-    )
+
     primera_consulta = models.OneToOneField(
         PrimeraConsulta,
         on_delete=models.SET_NULL,
