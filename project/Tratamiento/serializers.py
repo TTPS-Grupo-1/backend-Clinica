@@ -4,15 +4,16 @@ from CustomUser.models import CustomUser
 
 
 class TratamientoSerializer(serializers.ModelSerializer):
-    paciente_nombre = serializers.SerializerMethodField()
-    medico_nombre = serializers.SerializerMethodField()
+  #  paciente_nombre = serializers.SerializerMethodField()
+   # medico_nombre = serializers.SerializerMethodField()
     
     class Meta:
         model = Tratamiento
         fields = [
-            'id', 'nombre', 'descripcion', 'fecha_inicio', 
-            'paciente', 'paciente_nombre', 'medico', 'medico_nombre',
-            'activo', 'fecha_creacion', 'fecha_modificacion'
+            'id', 'fecha_inicio', 
+            'paciente', 'medico', 'medico',
+            'activo', 'fecha_creacion', 'fecha_modificacion', 'primera_consulta',
+            'segunda_consulta', 'transferencia', 'puncion', 'monitoreos', 'turnos'
         ]
         read_only_fields = ['fecha_creacion', 'fecha_modificacion']
     

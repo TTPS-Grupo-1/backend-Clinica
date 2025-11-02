@@ -7,7 +7,7 @@ def enviar_ordenes_por_email(consulta):
     """
     Envía todas las órdenes generadas para una PrimeraConsulta al paciente.
     """
-    paciente = consulta.paciente
+    paciente = consulta.tratamiento.paciente
     email_paciente = getattr(paciente, "email", None)
 
     if not email_paciente:

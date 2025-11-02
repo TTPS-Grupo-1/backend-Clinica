@@ -12,7 +12,7 @@ class TratamientoViewSet(viewsets.ModelViewSet):
     ViewSet para manejar operaciones CRUD de tratamientos.
     """
     queryset = Tratamiento.objects.all()
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
     
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -52,3 +52,28 @@ class TratamientoViewSet(viewsets.ModelViewSet):
         queryset = self.get_queryset().filter(activo=True)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], url_path=r'por-paciente/(?P<paciente_id>\d+)')
+    def tratamiento_por_paciente(self, request, paciente_id=None):
+        """
+        Devuelve el tratamiento activo del paciente especificado.
+        Ejemplo: /api/tratamientos/por-paciente?paciente_id=1
+        """
+        print(f"🧩 Buscando tratamiento activo para paciente_id={paciente_id}")
+        print("el rpj papap")
+        tratamientos = (
+            Tratamiento.objects
+            .filter(paciente_id=paciente_id, activo=True)
+            .order_by('-fecha_creacion')
+        )
+
+        if not tratamientos.exists():
+            return Response(
+                {"detail": f"No se encontró tratamiento activo para el paciente {paciente_id}."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        tratamiento = tratamientos.first()
+        serializer = self.get_serializer(tratamiento)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    

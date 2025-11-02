@@ -2,12 +2,6 @@ from django.db import models
 
 class SegundaConsulta(models.Model):
     
-    primera_consulta = models.OneToOneField(
-        'PrimerConsulta.PrimeraConsulta',
-        on_delete=models.CASCADE,
-        null=True,
-        related_name='segunda_consulta'
-    )
     
     ovocito_viable = models.BooleanField(default=False)
     semen_viable = models.BooleanField(default=False)
