@@ -13,7 +13,7 @@ class TratamientoSerializer(serializers.ModelSerializer):
             'id', 'fecha_inicio', 
             'paciente', 'medico', 'medico',
             'activo', 'fecha_creacion', 'fecha_modificacion', 'primera_consulta',
-            'segunda_consulta', 'transferencia', 'puncion', 'monitoreos', 'turnos'
+            'segunda_consulta', 'transferencia', 'puncion', 'turnos'
         ]
         read_only_fields = ['fecha_creacion', 'fecha_modificacion']
     

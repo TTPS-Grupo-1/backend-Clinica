@@ -9,6 +9,7 @@ class SegundaConsulta(models.Model):
     tipo_medicacion=models.CharField(max_length=255, null=True, blank=True)
     dosis_medicacion=models.CharField(max_length=255, null=True, blank=True)
     duracion_medicacion=models.CharField(max_length=255, null=True, blank=True)
+    droga = models.CharField(max_length=255, null=True, blank=True)
     
 
     fecha = models.DateTimeField(auto_now_add=True)
