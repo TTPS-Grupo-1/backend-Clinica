@@ -1,7 +1,10 @@
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import MonitoreoViewSet
+from Monitoreo.views.monitoreo_viewset import MonitoreoViewSet
 
 router = DefaultRouter()
 router.register(r'monitoreos', MonitoreoViewSet, basename='monitoreo')
 
-urlpatterns = router.urls
+urlpatterns = [
+    path('', include(router.urls)),
+]
