@@ -1,6 +1,5 @@
 from django.db import models
 from CustomUser.models import CustomUser
-from Monitoreo.models import Monitoreo
 from PrimerConsulta.models import PrimeraConsulta
 from Transferencia.models import Transferencia
 from Puncion.models import Puncion
@@ -37,12 +36,7 @@ class Tratamiento(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_modificacion = models.DateTimeField(auto_now=True)
 
-    # Relación ManyToMany con Monitoreos
-    monitoreos = models.ManyToManyField(
-        Monitoreo,
-        related_name='tratamientos',
-        help_text="Monitoreos asociados a este tratamiento"
-    )
+    
     primera_consulta = models.ForeignKey(
         PrimeraConsulta,
         on_delete=models.SET_NULL,
