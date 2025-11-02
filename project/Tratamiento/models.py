@@ -1,6 +1,5 @@
 from django.db import models
 from CustomUser.models import CustomUser
-from Monitoreo.models import Monitoreo
 from PrimerConsulta.models import PrimeraConsulta
 from Transferencia.models import Transferencia
 from Puncion.models import Puncion
