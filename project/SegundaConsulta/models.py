@@ -2,12 +2,6 @@ from django.db import models
 
 class SegundaConsulta(models.Model):
     
-    primera_consulta = models.OneToOneField(
-        'PrimerConsulta.PrimeraConsulta',
-        on_delete=models.CASCADE,
-        null=True,
-        related_name='segunda_consulta'
-    )
     
     ovocito_viable = models.BooleanField(default=False)
     semen_viable = models.BooleanField(default=False)
@@ -15,6 +9,7 @@ class SegundaConsulta(models.Model):
     tipo_medicacion=models.CharField(max_length=255, null=True, blank=True)
     dosis_medicacion=models.CharField(max_length=255, null=True, blank=True)
     duracion_medicacion=models.CharField(max_length=255, null=True, blank=True)
+    droga = models.CharField(max_length=255, null=True, blank=True)
     
 
     fecha = models.DateTimeField(auto_now_add=True)

@@ -44,17 +44,7 @@ class CreateSegundaConsultaMixin:
         consulta_data = {}
         
         # Obtener primera_consulta (puede venir como ID o objeto)
-        primera_consulta_id = safe_int(payload.get('primera_consulta_id')) or safe_int(payload.get('primera_consulta'))
-        if primera_consulta_id:
-            try:
-                primera_consulta = PrimeraConsulta.objects.get(id=primera_consulta_id)
-                consulta_data['primera_consulta'] = primera_consulta
-            except PrimeraConsulta.DoesNotExist:
-                return Response(
-                    {"error": f"PrimeraConsulta con ID {primera_consulta_id} no encontrada"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
+      
         # Extraer campos booleanos
         consulta_data['ovocito_viable'] = safe_bool(payload.get('ovocito_viable', False))
         consulta_data['semen_viable'] = safe_bool(payload.get('semen_viable', False))

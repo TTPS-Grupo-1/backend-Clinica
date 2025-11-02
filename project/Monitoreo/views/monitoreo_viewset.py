@@ -1,12 +1,11 @@
-from rest_framework import viewsets
-from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import viewsets, status
 from rest_framework.decorators import action
-import logging
-from datetime import datetime
-from ..models import Monitoreo
-from ..serializers import MonitoreoSerializer
+from rest_framework.response import Response
+from django.utils import timezone
+from Monitoreo.models import Monitoreo
+from Monitoreo.serializers import MonitoreoSerializer
 from Tratamiento.models import Tratamiento
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -201,8 +200,6 @@ class MonitoreoViewSet(viewsets.ModelViewSet):
         Obtiene monitoreos con fecha de atención próxima (no atendidos)
         GET /api/monitoreo/monitoreos/proximos/
         """
-        from django.utils import timezone
-        
         monitoreos = self.get_queryset().filter(
             atendido=False,
             fecha_atencion__isnull=False,
@@ -216,3 +213,47 @@ class MonitoreoViewSet(viewsets.ModelViewSet):
             "count": monitoreos.count(),
             "data": serializer.data
         })
+    
+    @action(detail=True, methods=['patch'], url_path='guardar_atencion')
+    def guardar_atencion(self, request, pk=None):
+        """
+        Marca un monitoreo como atendido y guarda la descripción.
+        """
+        try:
+            monitoreo = self.get_object()
+            
+            # Validar que no esté ya atendido
+            if monitoreo.atendido:
+                return Response(
+                    {'error': 'Este monitoreo ya fue atendido'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Obtener descripción
+            descripcion = request.data.get('descripcion', '').strip()
+            if not descripcion:
+                return Response(
+                    {'error': 'La descripción es requerida'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Actualizar el monitoreo
+            monitoreo.descripcion = descripcion
+            monitoreo.atendido = True
+            monitoreo.fecha_realizado = timezone.now()
+            monitoreo.save()
+            
+            serializer = self.get_serializer(monitoreo)
+            return Response(
+                {
+                    'message': 'Monitoreo atendido exitosamente',
+                    'data': serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+        
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

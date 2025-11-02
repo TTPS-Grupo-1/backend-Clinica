@@ -9,6 +9,7 @@ class Monitoreo(models.Model):
     """
     descripcion = models.CharField(
         max_length=500, 
+        blank=True,
         help_text="Descripción del monitoreo"
     )
     
@@ -37,6 +38,13 @@ class Monitoreo(models.Model):
         blank=True,
         help_text="Fecha y hora del turno en que se atenderá este monitoreo"
     )
+    
+    fecha_realizado = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Fecha en que se atendió realmente el monitoreo"
+    )
+
     
     class Meta:
         verbose_name = "Monitoreo"

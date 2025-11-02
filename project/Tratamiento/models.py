@@ -1,6 +1,5 @@
 from django.db import models
 from CustomUser.models import CustomUser
-from Monitoreo.models import Monitoreo
 from PrimerConsulta.models import PrimeraConsulta
 from Transferencia.models import Transferencia
 from Puncion.models import Puncion
@@ -21,7 +20,8 @@ class Tratamiento(models.Model):
         help_text="Descripción detallada del tratamiento"
     )
     fecha_inicio = models.DateField(
-        help_text="Fecha de inicio del tratamiento"
+        help_text="Fecha de inicio del tratamiento",
+        auto_now_add=True
     )
     medico = models.ForeignKey(
         CustomUser,
@@ -37,34 +37,37 @@ class Tratamiento(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_modificacion = models.DateTimeField(auto_now=True)
 
-    # Relación ManyToMany con Monitoreos
-    monitoreos = models.ManyToManyField(
-        Monitoreo,
-        related_name='tratamientos',
-        help_text="Monitoreos asociados a este tratamiento"
-    )
-    primera_consulta = models.ForeignKey(
+
+    primera_consulta = models.OneToOneField(
         PrimeraConsulta,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='tratamientos',
+        related_name='tratamiento',
         help_text="Primera consulta asociada al tratamiento"
     )
-    transferencia = models.ForeignKey(
+    segunda_consulta = models.OneToOneField(
+        'SegundaConsulta.SegundaConsulta',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tratamiento',
+        help_text="Segunda consulta asociada al tratamiento"
+    )
+    transferencia = models.OneToOneField(
         Transferencia,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='transferencias',
+        related_name='transferencia',
         help_text="Transferencia asociada al tratamiento"
     )
-    puncion = models.ForeignKey(
+    puncion = models.OneToOneField(
         Puncion,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='punciones',
+        related_name='puncion',
         help_text="Punción asociada al tratamiento"
     )
 

@@ -49,8 +49,9 @@ urlpatterns = [
     path('api/monitoreo/', include('Monitoreo.urls')),
     path('api/segunda_consulta/', include('SegundaConsulta.urls')),
     path('api/chatbot/', include('Chatbot.urls')),
-    path('api/tratamiento/', include('Tratamiento.urls')),
+    path('api/tratamientos/', include('Tratamiento.urls')),
     path('api/transferencia/', include('Transferencia.urls')),
+    path('api/resultado_estudio/', include('ResultadoEstudio.urls')),
 ]
 
 if settings.DEBUG:

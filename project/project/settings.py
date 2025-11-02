@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_extensions',
     'rest_framework',
     'corsheaders',
     'Paciente',
@@ -71,6 +72,7 @@ INSTALLED_APPS = [
     'Chatbot',
     'Tratamiento',
     'Transferencia',
+    'seed_data',  # ✅ Agregar al final
 ]
 
 AUTH_USER_MODEL = 'CustomUser.CustomUser'

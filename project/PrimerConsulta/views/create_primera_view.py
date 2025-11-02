@@ -10,10 +10,12 @@ from AntecedentesPersonales.models import AntecedentesPersonales
 from Fenotipo.models import Fenotipo
 from ResultadoEstudio.models import ResultadoEstudio
 from Orden.models import Orden
+from Tratamiento.models import Tratamiento
 from Orden.orden_service import generar_orden_y_guardar
 import logging
 from Orden.orden_email_service import enviar_ordenes_por_email
 from .generar_orden_pago import registrar_orden_pago
+from CustomUser.models import CustomUser
 
 
 
@@ -74,10 +76,7 @@ class CreatePrimeraConsultaMixin:
         print("medico_id:", medico_id)
 
 
-        if paciente_id:
-            consulta_data['paciente'] = paciente_id  
-        if medico_id:
-            consulta_data['medico'] = medico_id     
+           
 
         # Preparar serializer solo para la consulta (sin antecedentes)
         # Mapear campos de 'form' adicionales al modelo PrimeraConsulta
@@ -262,20 +261,27 @@ class CreatePrimeraConsultaMixin:
 
         try:
             # --- Estudios prequirúrgicos ---
-            e1 = form.get('estudios_prequirurgicos') or form.get('estudios_prequirurgicos_mujer1') or form.get('estudios_prequirurgicos_mujer') or form.get('prequirurgicos') or {}
+            e1 = form.get('estudios_prequirurgicos') or form.get('estudios_prequirurgicos_mujer1') \
+                or form.get('estudios_prequirurgicos_mujer') or form.get('prequirurgicos') or {}
             e2 = form.get('estudios_prequirurgicos_mujer2') or form.get('estudios_prequirurgicos_hombre') or {}
+
             print("estudios prequirurgicos 1 raw:", e1)
             print("estudios prequirurgicos 2 raw:", e2)
-  
 
+            # 🔹 Si vienen anidados dentro de "valores", los extraemos
+            if isinstance(e1, dict) and "valores" in e1:
+                e1 = e1["valores"]
+            if isinstance(e2, dict) and "valores" in e2:
+                e2 = e2["valores"]
 
             nombre_estudios_preq_1 = [nombre for nombre, valor in e1.items() if valor]
             nombre_estudios_preq_2 = [nombre for nombre, valor in e2.items() if valor]
+
             print("🧾 estudios prequirurgicos 1:", nombre_estudios_preq_1)
             print("🧾 estudios prequirurgicos 2:", nombre_estudios_preq_2)
 
         except Exception as e:
-            print("⚠️ Error procesando estudios prequirúrgicos:", e)
+            print("⚠️ Error procesando estudios prequirúrgicos:", str(e))
 
 
         estudios_semen = form.get('estudios_semen', {}).get('estudiosSeleccionados') or None
@@ -291,6 +297,16 @@ class CreatePrimeraConsultaMixin:
         try:
             with transaction.atomic():
                 consulta = serializer.save()
+                paciente = CustomUser.objects.get(id=paciente_id)
+                medico = CustomUser.objects.get(id=medico_id)
+               
+                # Crear el tratamiento vinculado a esta primera consulta
+                Tratamiento.objects.create(
+                    paciente=paciente,
+                    medico=medico,
+                    primera_consulta=consulta,
+                    objetivo=consulta.objetivo_consulta or "Tratamiento inicial",
+                )
 
                 # Crear antecedentes vinculados si vienen datos
                 if antecedentes_payload and any(v is not None for v in antecedentes_payload.values()):
@@ -309,6 +325,8 @@ class CreatePrimeraConsultaMixin:
                     
                 if fenotipo_payload and any(v not in [None, ""] for v in fenotipo_payload.values()):
                     Fenotipo.objects.create(consulta=consulta, **fenotipo_payload)
+
+                
                 
                 if estudios_ginecologicos_1:
                     for estudio_nombre in estudios_ginecologicos_1:
@@ -316,12 +334,13 @@ class CreatePrimeraConsultaMixin:
                             consulta=consulta,
                             tipo_estudio="GINECOLOGICO",
                             nombre_estudio=estudio_nombre,
+                            persona= "PACIENTE"
                         )
                     generar_orden_y_guardar(consulta=consulta,
                                             tipo_estudio="estudios_ginecologicos",
                                             determinaciones=estudios_ginecologicos_1,
-                                            medico=consulta.medico,
-                                            paciente=consulta.paciente,
+                                            medico=medico,
+                                            paciente=paciente,
                                             acompañante="no")
                 if estudios_ginecologicos_2:
                     for estudio_nombre in estudios_ginecologicos_2:
@@ -329,12 +348,13 @@ class CreatePrimeraConsultaMixin:
                             consulta=consulta,
                             tipo_estudio="GINECOLOGICO",
                             nombre_estudio=estudio_nombre,
+                            persona= "ACOMPAÑANTE"
                         )
                     generar_orden_y_guardar(consulta=consulta,
                                             tipo_estudio="estudios_ginecologicos",
                                             determinaciones=estudios_ginecologicos_2,
-                                            medico=consulta.medico,
-                                            paciente=consulta.paciente,
+                                            medico=medico,
+                                            paciente=paciente,
                                             acompañante="si")
                 if nombre_estudios_preq_1:
                     for estudio_nombre in nombre_estudios_preq_1:
@@ -342,12 +362,13 @@ class CreatePrimeraConsultaMixin:
                             consulta=consulta,
                             tipo_estudio="PREQUIRURGICO",
                             nombre_estudio=estudio_nombre,
+                            persona= "PACIENTE"
                         )
                     generar_orden_y_guardar(consulta=consulta,
                                             tipo_estudio="estudios_prequirurgicos",
                                             determinaciones=nombre_estudios_preq_1,
-                                            medico=consulta.medico,
-                                            paciente=consulta.paciente,
+                                            medico=medico,
+                                            paciente=paciente,
                                             acompañante="no")
                 if nombre_estudios_preq_2:
                     for estudio_nombre in nombre_estudios_preq_2:
@@ -355,12 +376,13 @@ class CreatePrimeraConsultaMixin:
                             consulta=consulta,
                             tipo_estudio="PREQUIRURGICO",
                             nombre_estudio=estudio_nombre,
+                            persona= "ACOMPAÑANTE"
                         )
                     generar_orden_y_guardar(consulta=consulta,
                                             tipo_estudio="estudios_prequirurgicos",
                                             determinaciones=nombre_estudios_preq_2,
-                                            medico=consulta.medico,
-                                            paciente=consulta.paciente,
+                                            medico=medico,
+                                            paciente=paciente,
                                             acompañante="si")
                 if estudios_semen:
                     for estudio_nombre in estudios_semen:
@@ -368,12 +390,13 @@ class CreatePrimeraConsultaMixin:
                             consulta=consulta,
                             tipo_estudio="SEMINAL",
                             nombre_estudio=estudio_nombre,
+                            persona= "ACOMPAÑANTE"
                         )
                     generar_orden_y_guardar(consulta=consulta,
                                             tipo_estudio="estudios_semen",
                                             determinaciones=estudios_semen,
-                                            medico=consulta.medico,
-                                            paciente=consulta.paciente,
+                                            medico=medico,
+                                            paciente=paciente,
                                             acompañante="si")
                 if estudios_hormonales_1:
                     for estudio_nombre in estudios_hormonales_1:
@@ -381,12 +404,13 @@ class CreatePrimeraConsultaMixin:
                             consulta=consulta,
                             tipo_estudio="HORMONAL",
                             nombre_estudio=estudio_nombre,
+                            persona= "PACIENTE"
                         )
                     generar_orden_y_guardar(consulta=consulta,
                                             tipo_estudio="estudios_hormonales",
                                             determinaciones=estudios_hormonales_1,
-                                            medico=consulta.medico,
-                                            paciente=consulta.paciente,
+                                            medico=medico,
+                                            paciente=paciente,
                                             acompañante="no")
                 if estudios_hormonales_2:
                     for estudio_nombre in estudios_hormonales_2:
@@ -394,21 +418,24 @@ class CreatePrimeraConsultaMixin:
                             consulta=consulta,
                             tipo_estudio="HORMONAL",
                             nombre_estudio=estudio_nombre,
+                            persona= "ACOMPAÑANTE"
                         )
                     generar_orden_y_guardar(consulta=consulta,
                                             tipo_estudio="estudios_hormonales",
                                             determinaciones=estudios_hormonales_2,
-                                            medico=consulta.medico,
-                                            paciente=consulta.paciente,
+                                            medico=medico,
+                                            paciente=paciente,
                                             acompañante="si")
                 # Enviar órdenes por email al paciente
                 enviar_ordenes_por_email(consulta)
-                print("Paciente obra social:", consulta.paciente.obra_social)
+
+                # Registrar orden de pago (usando la instancia de paciente)
+                print("Paciente obra social:", paciente.obra_social)
                 print("Datos de la orden de pago:")
                 print("Grupo:", 1)
-                print("ID Paciente:", consulta.paciente.id)
+                print("ID Paciente:", paciente.id)
                 print("Monto:", 10000.0)
-                registrar_orden_pago(consulta.paciente.id, consulta.paciente.obra_social, 1, 10000.0)
+                registrar_orden_pago(paciente.id, paciente.obra_social, 1, 10000.0)
                 
 
 
