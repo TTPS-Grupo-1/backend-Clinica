@@ -1,19 +1,7 @@
 from django.db import models
 
 class PrimeraConsulta(models.Model):
-    paciente = models.ForeignKey(
-        'CustomUser.CustomUser',
-        on_delete=models.CASCADE,
-        null=True,
-        related_name='primeras_consultas'
-    )
 
-    medico = models.ForeignKey(
-        'CustomUser.CustomUser',
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name='primeras_consultas_realizadas'
-    )
 
     objetivo_consulta = models.TextField(null=True, blank=True)
     antecedentes_clinicos_1 = models.JSONField(null=True, blank=True)

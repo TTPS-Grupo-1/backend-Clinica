@@ -47,9 +47,11 @@ urlpatterns = [
     path('api/turnos/mis_turnos/', turnos_proxy_get_turnos_paciente, name='turnos_proxy_get_turnos_paciente'),
     path('api/turnos/cancelar_turno/', turnos_proxy_cancelar, name='turnos_proxy_cancelar'),
     path('api/monitoreo/', include('Monitoreo.urls')),
+    path('api/segunda_consultas/', include('SegundaConsulta.urls')),
     path('api/chatbot/', include('Chatbot.urls')),
-    path('api/tratamiento/', include('Tratamiento.urls')),
+    path('api/tratamientos/', include('Tratamiento.urls')),
     path('api/transferencia/', include('Transferencia.urls')),
+    path('api/resultado_estudio/', include('ResultadoEstudio.urls')),
 ]
 
 if settings.DEBUG:
