@@ -1,5 +1,7 @@
 import json
 import logging
+import requests
+from io import BytesIO
 from django.db import transaction, IntegrityError
 from rest_framework import status
 from rest_framework.response import Response
@@ -8,13 +10,21 @@ from ..models import SegundaConsulta
 from Tratamiento.models import Tratamiento
 from Monitoreo.models import Monitoreo
 from ResultadoEstudio.models import ResultadoEstudio
+from django.conf import settings
+from django.core.files.base import ContentFile
+from django.core.mail import EmailMessage
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+SUPABASE_EDGE_URL = "https://srlgceodssgoifgosyoh.supabase.co/functions/v1/generar_orden_medica"  # 🔧 reemplazá con tu URL real
+
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNybGdjZW9kc3Nnb2lmZ29zeW9oIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MDQ0NTU3NiwiZXhwIjoyMDc2MDIxNTc2fQ.4KDD7JytM2J8jMxl6WmYyTArThY4Dd8s6ACJZdYMJMY"
 
 class CreateSegundaConsultaMixin:
     """
     Crea una SegundaConsulta, actualiza los estudios y registra los monitoreos.
-    Compatible con tu modelo actual (campos planos y BinaryField para PDF).
+    Luego genera la orden médica de la droga llamando a la Edge Function de Supabase.
     """
 
     def create(self, request, *args, **kwargs):
@@ -22,7 +32,7 @@ class CreateSegundaConsultaMixin:
 
         try:
             with transaction.atomic():
-                # ---------- 1️⃣ Parseo de datos del request ----------
+                # ---------- 1️⃣ Parseo de datos ----------
                 tratamiento_id = request.data.get("tratamiento_id")
                 protocolo = json.loads(request.data.get("protocolo", "{}"))
                 monitoreos = json.loads(request.data.get("monitoreo", "[]"))
@@ -32,14 +42,14 @@ class CreateSegundaConsultaMixin:
 
                 # ---------- 2️⃣ Validar tratamiento ----------
                 try:
-                    tratamiento = Tratamiento.objects.get(id=tratamiento_id)
+                    tratamiento = Tratamiento.objects.select_related("paciente", "medico").get(id=tratamiento_id)
                 except Tratamiento.DoesNotExist:
                     return Response(
                         {"error": f"Tratamiento con id {tratamiento_id} no encontrado"},
                         status=status.HTTP_404_NOT_FOUND,
                     )
 
-                # ---------- 3️⃣ Crear la segunda consulta ----------
+                # ---------- 3️⃣ Crear Segunda Consulta ----------
                 segunda_data = {
                     "droga": protocolo.get("droga"),
                     "tipo_medicacion": protocolo.get("tipo"),
@@ -48,10 +58,9 @@ class CreateSegundaConsultaMixin:
                     "ovocito_viable": conclusion.get("ovocitoViable", False),
                     "semen_viable": conclusion.get("semenViable", False),
                 }
-
                 if consentimiento:
                     segunda_data["consentimiento_informado"] = consentimiento
-                
+
                 segunda_serializer = SegundaConsultaSerializer(data=segunda_data)
                 segunda_serializer.is_valid(raise_exception=True)
                 segunda = segunda_serializer.save()
@@ -65,7 +74,7 @@ class CreateSegundaConsultaMixin:
                     Monitoreo.objects.create(
                         tratamiento=tratamiento,
                         fecha_atencion=fecha,
-                        descripcion="Monitoreo programado desde segunda consulta"
+                        descripcion="Monitoreo programado desde segunda consulta",
                     )
 
                 # ---------- 6️⃣ Actualizar Resultados de Estudios ----------
@@ -77,7 +86,90 @@ class CreateSegundaConsultaMixin:
                     except ResultadoEstudio.DoesNotExist:
                         logger.warning(f"Estudio ID {est.get('id')} no encontrado")
 
-                # ---------- 7️⃣ Respuesta ----------
+                # ---------- 7️⃣ Generar Orden Médica de la Droga ----------
+                try:
+                    payload = {
+                        "tipo_estudio": "orden_droga",
+                        "droga": protocolo.get("droga"),
+                        "tipo_medicacion": protocolo.get("tipo"),
+                        "dosis_medicacion": protocolo.get("dosis"),
+                        "duracion_medicacion": protocolo.get("duracion"),
+                        "paciente": {
+                            "nombre": f"{tratamiento.paciente.first_name} {tratamiento.paciente.last_name}",
+                            "dni": getattr(tratamiento.paciente, "dni", None),
+                        },
+                        "medico": {
+                            "nombre": f"{tratamiento.medico.first_name} {tratamiento.medico.last_name}",
+                        },
+                    }
+
+                    # 🧾 Construir payload para multipart/form-data
+                    files = {
+                        "payload": (None, json.dumps(payload), "application/json"),
+                    }
+
+                    # 📎 Adjuntar la firma si existe
+                    if getattr(tratamiento.medico, "firma_medico", None):
+                        try:
+                            with open(tratamiento.medico.firma_medico.path, "rb") as f:
+                                firma_bytes = f.read()
+                            files["firma_medico"] = ("firma.png", BytesIO(firma_bytes), "image/png")
+                            logger.info("🖋️ Firma del médico adjuntada correctamente.")
+                        except Exception as e:
+                            logger.warning(f"⚠️ No se pudo leer la firma del médico: {e}")
+
+                    # 🔧 Headers (sin Content-Type fijo, requests lo define automáticamente)
+                    headers = {
+                        "Authorization": f"Bearer {SUPABASE_KEY}"
+                    }
+
+                    # 📤 Enviar datos a la Edge Function de Supabase
+                    logger.info("📤 Enviando datos a Edge Function de Supabase (con firma adjunta)...")
+                    resp = requests.post(SUPABASE_EDGE_URL, headers=headers, files=files)
+
+                    if resp.status_code == 200 and resp.headers.get("Content-Type") == "application/pdf":
+                        pdf_bytes = resp.content
+                        filename = f"orden_droga_tratamiento_{tratamiento.id}.pdf"
+
+                        # 💾 Guardar el PDF en el modelo SegundaConsulta
+                        segunda.orden_droga_pdf.save(filename, ContentFile(pdf_bytes))
+                        segunda.save(update_fields=["orden_droga_pdf"])
+
+                        logger.info(f"📄 Orden médica guardada y con firma: {segunda.orden_droga_pdf.url}")
+                    else:
+                        logger.error(f"❌ Error generando orden médica en Supabase: {resp.text}")
+
+                except Exception as e:
+                    logger.error(f"❌ Error generando orden médica en Supabase: {e}")
+                    
+                try:
+                    paciente_email = tratamiento.paciente.email
+                    medico_nombre = f"{tratamiento.medico.first_name} {tratamiento.medico.last_name}"
+                    
+                    subject = "Orden médica de medicación"
+                    message = (
+                        f"Hola {tratamiento.paciente.first_name},\n\n"
+                        f"Tu médico {medico_nombre} ha generado una nueva orden médica.\n"
+                        f"Podés consultar el PDF adjunto.\n\n"
+                        f"Saludos,\nClínica de Fertilidad"
+                    )
+                    
+                    email = EmailMessage(
+                        subject,
+                        message,
+                        settings.DEFAULT_FROM_EMAIL,
+                        [paciente_email],
+                    )
+                    
+                    email.attach(filename, pdf_bytes, "application/pdf")
+                    email.send()
+                    
+                    logger.info(f"📧 Orden médica enviada por email a {paciente_email}")
+
+                except Exception as e:
+                    logger.error(f"❌ Error enviando correo con la orden médica: {e}")
+
+                # ---------- 8️⃣ Respuesta ----------
                 response_data = {
                     "success": True,
                     "message": "Segunda consulta creada exitosamente",

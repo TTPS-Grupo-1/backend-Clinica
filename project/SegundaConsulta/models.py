@@ -18,6 +18,13 @@ class SegundaConsulta(models.Model):
     
 
     fecha = models.DateTimeField(auto_now_add=True)
+    orden_droga_pdf = models.FileField(
+        upload_to="ordenes_droga/",
+        null=True,
+        blank=True,
+        help_text="Archivo PDF de la orden médica generada automáticamente"
+    )
+
 
     def __str__(self):
         return f"Segunda consulta de {self.paciente}"
