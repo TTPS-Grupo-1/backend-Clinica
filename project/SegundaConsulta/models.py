@@ -5,7 +5,12 @@ class SegundaConsulta(models.Model):
     
     ovocito_viable = models.BooleanField(default=False)
     semen_viable = models.BooleanField(default=False)
-    consentimiento_informado = models.BinaryField(null=True, blank=True)
+    consentimiento_informado = models.FileField(
+        upload_to="consentimientos/",
+        null=True,
+        blank=True,
+        help_text="Archivo PDF del consentimiento informado"
+    )
     tipo_medicacion=models.CharField(max_length=255, null=True, blank=True)
     dosis_medicacion=models.CharField(max_length=255, null=True, blank=True)
     duracion_medicacion=models.CharField(max_length=255, null=True, blank=True)

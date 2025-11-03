@@ -7,7 +7,6 @@ class SegundaConsultaSerializer(serializers.ModelSerializer):
         model = SegundaConsulta
         fields = [
             'id',
-            'primera_consulta',
             'ovocito_viable',
             'semen_viable',
             'consentimiento_informado',
@@ -15,5 +14,6 @@ class SegundaConsultaSerializer(serializers.ModelSerializer):
             'dosis_medicacion',
             'duracion_medicacion',
             'fecha',
+            'droga'
         ]
         read_only_fields = ['id', 'fecha']

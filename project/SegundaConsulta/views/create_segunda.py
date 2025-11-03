@@ -1,113 +1,104 @@
+import json
+import logging
+from django.db import transaction, IntegrityError
 from rest_framework import status
 from rest_framework.response import Response
-from django.db import IntegrityError, transaction
 from ..serializers import SegundaConsultaSerializer
 from ..models import SegundaConsulta
-from .. import models as sc_models
-from .. import serializers as sc_serializers
-from PrimerConsulta.models import PrimeraConsulta
-import logging
+from Tratamiento.models import Tratamiento
+from Monitoreo.models import Monitoreo
+from ResultadoEstudio.models import ResultadoEstudio
 
 logger = logging.getLogger(__name__)
 
-
 class CreateSegundaConsultaMixin:
     """
-    Mixin para manejar la creación de SegundaConsulta.
-    Sigue la misma estructura y formato de respuesta que CreatePrimeraConsultaMixin.
+    Crea una SegundaConsulta, actualiza los estudios y registra los monitoreos.
+    Compatible con tu modelo actual (campos planos y BinaryField para PDF).
     """
 
     def create(self, request, *args, **kwargs):
-        payload = request.data
-        print("Payload recibido:", payload)
-        
-        # Helper to safely convert numeric-like strings to int or None
-        def safe_int(v):
-            try:
-                if v is None or v == "":
-                    return None
-                return int(v)
-            except (TypeError, ValueError):
-                return None
-
-        # Helper to safely convert to boolean
-        def safe_bool(v):
-            if v is None or v == "":
-                return False
-            if isinstance(v, bool):
-                return v
-            if isinstance(v, str):
-                return v.lower() in ['true', '1', 'yes', 'on']
-            return bool(v)
-
-        # Normalizar datos principales de SegundaConsulta
-        consulta_data = {}
-        
-        # Obtener primera_consulta (puede venir como ID o objeto)
-      
-        # Extraer campos booleanos
-        consulta_data['ovocito_viable'] = safe_bool(payload.get('ovocito_viable', False))
-        consulta_data['semen_viable'] = safe_bool(payload.get('semen_viable', False))
-        
-        # Extraer campos de medicación
-        consulta_data['tipo_medicacion'] = payload.get('tipo_medicacion')
-        consulta_data['dosis_medicacion'] = payload.get('dosis_medicacion')
-        consulta_data['duracion_medicacion'] = payload.get('duracion_medicacion')
-        
-        # Manejar consentimiento informado (archivo binario)
-        if 'consentimiento_informado' in request.FILES:
-            consulta_data['consentimiento_informado'] = request.FILES['consentimiento_informado'].read()
-        elif payload.get('consentimiento_informado'):
-            consulta_data['consentimiento_informado'] = payload.get('consentimiento_informado')
+        print("📩 Payload recibido:", request.data)
 
         try:
             with transaction.atomic():
-                # Crear la segunda consulta
-                serializer = SegundaConsultaSerializer(data=consulta_data)
-                
-                if serializer.is_valid():
-                    segunda_consulta = serializer.save()
-                    
-                    logger.info(f"✅ SegundaConsulta creada exitosamente: ID {segunda_consulta.id}")
-                    
-                    # Preparar respuesta exitosa
-                    response_data = {
-                        "success": True,
-                        "message": "Segunda consulta creada exitosamente",
-                        "data": {
-                            "segunda_consulta": SegundaConsultaSerializer(segunda_consulta).data
-                        }
-                    }
-                    
-                    return Response(response_data, status=status.HTTP_201_CREATED)
-                else:
-                    logger.error(f"❌ Error en validación del serializer: {serializer.errors}")
+                # ---------- 1️⃣ Parseo de datos del request ----------
+                tratamiento_id = request.data.get("tratamiento_id")
+                protocolo = json.loads(request.data.get("protocolo", "{}"))
+                monitoreos = json.loads(request.data.get("monitoreo", "[]"))
+                estudios = json.loads(request.data.get("estudios", "[]"))
+                conclusion = json.loads(request.data.get("conclusion", "{}"))
+                consentimiento = request.FILES.get("consentimiento")
+
+                # ---------- 2️⃣ Validar tratamiento ----------
+                try:
+                    tratamiento = Tratamiento.objects.get(id=tratamiento_id)
+                except Tratamiento.DoesNotExist:
                     return Response(
-                        {
-                            "success": False,
-                            "message": "Error en los datos proporcionados",
-                            "errors": serializer.errors
-                        },
-                        status=status.HTTP_400_BAD_REQUEST
+                        {"error": f"Tratamiento con id {tratamiento_id} no encontrado"},
+                        status=status.HTTP_404_NOT_FOUND,
                     )
-                    
+
+                # ---------- 3️⃣ Crear la segunda consulta ----------
+                segunda_data = {
+                    "droga": protocolo.get("droga"),
+                    "tipo_medicacion": protocolo.get("tipo"),
+                    "dosis_medicacion": protocolo.get("dosis"),
+                    "duracion_medicacion": protocolo.get("duracion"),
+                    "ovocito_viable": conclusion.get("ovocitoViable", False),
+                    "semen_viable": conclusion.get("semenViable", False),
+                }
+
+                if consentimiento:
+                    segunda_data["consentimiento_informado"] = consentimiento
+                
+                segunda_serializer = SegundaConsultaSerializer(data=segunda_data)
+                segunda_serializer.is_valid(raise_exception=True)
+                segunda = segunda_serializer.save()
+
+                # ---------- 4️⃣ Asociar al tratamiento ----------
+                tratamiento.segunda_consulta = segunda
+                tratamiento.save(update_fields=["segunda_consulta"])
+
+                # ---------- 5️⃣ Crear Monitoreos ----------
+                for fecha in monitoreos:
+                    Monitoreo.objects.create(
+                        tratamiento=tratamiento,
+                        fecha_atencion=fecha,
+                        descripcion="Monitoreo programado desde segunda consulta"
+                    )
+
+                # ---------- 6️⃣ Actualizar Resultados de Estudios ----------
+                for est in estudios:
+                    try:
+                        resultado = ResultadoEstudio.objects.get(id=est["id"])
+                        resultado.valor = est.get("valor")
+                        resultado.save()
+                    except ResultadoEstudio.DoesNotExist:
+                        logger.warning(f"Estudio ID {est.get('id')} no encontrado")
+
+                # ---------- 7️⃣ Respuesta ----------
+                response_data = {
+                    "success": True,
+                    "message": "Segunda consulta creada exitosamente",
+                    "segunda_consulta": segunda_serializer.data,
+                    "monitoreos_creados": len(monitoreos),
+                    "estudios_actualizados": len(estudios),
+                }
+
+                logger.info(f"✅ SegundaConsulta creada: ID {segunda.id}")
+                return Response(response_data, status=status.HTTP_201_CREATED)
+
         except IntegrityError as e:
-            logger.error(f"❌ Error de integridad en la base de datos: {str(e)}")
+            logger.error(f"❌ Error de integridad: {e}")
             return Response(
-                {
-                    "success": False,
-                    "message": "Error de integridad en la base de datos",
-                    "error": str(e)
-                },
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "Error de integridad en base de datos", "detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST,
             )
+
         except Exception as e:
-            logger.error(f"❌ Error inesperado al crear SegundaConsulta: {str(e)}")
+            logger.error(f"❌ Error inesperado: {e}")
             return Response(
-                {
-                    "success": False,
-                    "message": "Error interno del servidor",
-                    "error": str(e)
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": "Error interno del servidor", "detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
