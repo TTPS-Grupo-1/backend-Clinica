@@ -29,6 +29,22 @@ class Fertilizacion(models.Model):
 	# Información del semen: campo libre y un posible id numérico si se integra otra tabla
 	semen_info = models.CharField(max_length=150, null=True, blank=True, help_text='Identificador o notas del semen utilizado')
 	semen_id = models.IntegerField(null=True, blank=True, help_text='ID del semen si existe una entidad externa')
+	
+	# Nuevos campos para banco de semen
+	banco_semen_id = models.IntegerField(null=True, blank=True, help_text='ID del semen del banco cuando se requiere por coincidencia fenotípica')
+	
+	RAZON_BANCO_CHOICES = [
+		('semen_no_ok', 'Semen de pareja masculina no apto'),
+		('pareja_femenina', 'Pareja femenina - requiere banco'),
+		('sin_pareja', 'Sin pareja - requiere banco'),
+		('no_aplica', 'No requiere banco de semen'),
+	]
+	razon_banco_semen = models.CharField(
+		max_length=20, 
+		choices=RAZON_BANCO_CHOICES, 
+		default='no_aplica',
+		help_text='Razón por la cual se usa banco de semen'
+	)
 
 	fecha_fertilizacion = models.DateField()
 

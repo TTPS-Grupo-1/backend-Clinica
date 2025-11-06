@@ -131,6 +131,7 @@ class Command(BaseCommand):
         self.stdout.write('\n💊 Creando tratamientos con primera consulta y datos asociados...')
         
         from PrimerConsulta.models import PrimeraConsulta
+        from SegundaConsulta.models import SegundaConsulta
         from Fenotipo.models import Fenotipo
         from ResultadoEstudio.models import ResultadoEstudio
         from AntecedentesGinecologicos.models import AntecedentesGinecologicos
@@ -154,12 +155,20 @@ class Command(BaseCommand):
                 examen_fisico_2='Signos vitales normales, exploración ginecológica normal'
             )
             
+            # Objetivos realistas para probar diferentes casos
+            objetivos = [
+                'Embarazo gameto propio',  # Pareja heterosexual
+                'Embarazo con pareja del mismo sexo',  # Pareja lesbiana
+                'Mujer sin pareja - Donante de espermatozoide',  # Mujer sola
+                'ROPA - Una aporta la célula y la otra el óvulo',  # Técnica ROPA
+            ]
+            
             # Crear Tratamiento asociado a la Primera Consulta
             tratamiento, created = Tratamiento.objects.get_or_create(
                 paciente=paciente,
                 medico=medico,
                 defaults={
-                    'objetivo': f'Tratamiento de fertilidad para {paciente.first_name}',
+                    'objetivo': objetivos[i % len(objetivos)],
                     'fecha_inicio': timezone.now().date() - timedelta(days=30),
                     'activo': True,
                     'primera_consulta': primera_consulta,
@@ -233,7 +242,56 @@ class Command(BaseCommand):
             tratamientos.append(tratamiento)
 
         # =====================================
-        # 4. CREAR TURNOS Y ASOCIARLOS A TRATAMIENTOS
+        # 4. CREAR SEGUNDAS CONSULTAS
+        # =====================================
+        self.stdout.write('\n🔬 Creando segundas consultas...')
+        
+        # Datos para segundas consultas con diferentes escenarios de semen viable
+        semen_viable_scenarios = [True, False, True]  # Diferentes casos para probar
+        
+        for i, tratamiento in enumerate(tratamientos):
+            if not tratamiento.segunda_consulta:  # Solo crear si no existe
+                semen_viable = semen_viable_scenarios[i % len(semen_viable_scenarios)]
+                
+                # Crear la segunda consulta
+                segunda_consulta = SegundaConsulta.objects.create(
+                    semen_viable=semen_viable,
+                    ovocito_viable=True,  # Asumir que es viable por defecto
+                )
+                
+                # Asignar la segunda consulta al tratamiento
+                tratamiento.segunda_consulta = segunda_consulta
+                tratamiento.save()
+                
+                self.stdout.write(
+                    f'  ✅ Segunda consulta creada para {tratamiento.paciente.first_name} - '
+                    f'Semen viable: {semen_viable}'
+                )
+        
+        for i, tratamiento in enumerate(tratamientos):
+            if not tratamiento.segunda_consulta:  # Solo crear si no existe
+                segunda_data = segundas_consultas_data[i % len(segundas_consultas_data)]
+                
+                # Crear la segunda consulta
+                segunda_consulta = SegundaConsulta.objects.create(
+                    fecha=timezone.now() + timedelta(days=7),  # 7 días después de la primera consulta
+                    semen_viable=segunda_data['semen_viable'],
+                    ovocito_viable=True,  # Asumir que es viable por defecto
+                    observaciones=segunda_data['observaciones']
+                )
+                
+                # Asignar la segunda consulta al tratamiento
+                tratamiento.segunda_consulta = segunda_consulta
+                tratamiento.save()
+                
+                if created:
+                    self.stdout.write(
+                        f'  ✅ Segunda consulta creada para {tratamiento.paciente.first_name} - '
+                        f'Semen viable: {segunda_data["semen_viable"]}'
+                    )
+
+        # =====================================
+        # 5. CREAR TURNOS Y ASOCIARLOS A TRATAMIENTOS
         # =====================================
         self.stdout.write('\n📅 Creando turnos y asociándolos a tratamientos...')
         
@@ -260,7 +318,7 @@ class Command(BaseCommand):
             self.stdout.write(f'    ✅ Turno asociado al Tratamiento #{tratamiento.id}')
 
         # =====================================
-        # 5. CREAR MONITOREOS
+        # 6. CREAR MONITOREOS
         # =====================================
         self.stdout.write('\n📋 Creando monitoreos...')
         
@@ -315,7 +373,7 @@ class Command(BaseCommand):
                 )
 
         # =====================================
-        # 6. RESUMEN
+        # 7. RESUMEN
         # =====================================
         self.stdout.write(self.style.SUCCESS('\n' + '='*60))
         self.stdout.write(self.style.SUCCESS('✅ BASE DE DATOS INICIALIZADA'))
