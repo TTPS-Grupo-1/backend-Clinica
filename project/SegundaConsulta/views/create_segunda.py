@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 import logging
 import requests
@@ -14,13 +15,14 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMessage
 from django.conf import settings
+from Turnos.models import Turno
 
 logger = logging.getLogger(__name__)
 
 SUPABASE_EDGE_URL = "https://srlgceodssgoifgosyoh.supabase.co/functions/v1/generar_orden_medica"  # 🔧 reemplazá con tu URL real
-
+SUPABASE_RESERVAR_URL = "https://ahlnfxipnieoihruewaj.supabase.co/functions/v1/reservar_turno"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNybGdjZW9kc3Nnb2lmZ29zeW9oIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MDQ0NTU3NiwiZXhwIjoyMDc2MDIxNTc2fQ.4KDD7JytM2J8jMxl6WmYyTArThY4Dd8s6ACJZdYMJMY"
-
+SUPABASE_KEY_RESERVAR = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZF9ncnVwbyI6MSwiaWF0IjoxNzYwNzI0ODEzfQ.9SeVdilNSRro5wivM50crPF-B1Mn1KB_2z65PXF1hbc"
 class CreateSegundaConsultaMixin:
     """
     Crea una SegundaConsulta, actualiza los estudios y registra los monitoreos.
@@ -70,12 +72,61 @@ class CreateSegundaConsultaMixin:
                 tratamiento.save(update_fields=["segunda_consulta"])
 
                 # ---------- 5️⃣ Crear Monitoreos ----------
-                for fecha in monitoreos:
-                    Monitoreo.objects.create(
-                        tratamiento=tratamiento,
-                        fecha_atencion=fecha,
-                        descripcion="Monitoreo programado desde segunda consulta",
-                    )
+                for item in monitoreos:
+                    # Si el frontend envía un dict con id_turno y fecha_hora
+                    if isinstance(item, dict):
+                        fecha_str = item.get("fecha_hora")
+                        id_turno = item.get("id_turno")
+                    else:
+                        fecha_str = item
+                        id_turno = None
+
+                    if not fecha_str:
+                        continue
+
+                    try:
+                        # Asegurarse de que es un string válido ISO o con espacio
+                        if isinstance(fecha_str, str):
+                            fecha_atencion = datetime.fromisoformat(fecha_str)
+                        else:
+                            raise ValueError("Fecha inválida")
+
+                        # Crear el registro de Monitoreo
+                        Monitoreo.objects.create(
+                            tratamiento=tratamiento,
+                            fecha_atencion=fecha_atencion,
+                            descripcion="Monitoreo programado desde segunda consulta",
+                        )
+                        if id_turno:
+                            payload = {"id_paciente": tratamiento.paciente.id, "id_turno": id_turno}
+                            try:
+                                resp = requests.patch(
+                                    SUPABASE_RESERVAR_URL,
+                                    headers={
+                                        "Authorization": f"Bearer {SUPABASE_KEY_RESERVAR}",
+                                    },
+                                    json=payload,
+                                )
+                                if resp.ok:
+                                    logger.info(f"✅ Turno {id_turno} reservado correctamente")
+                                    
+                                    Turno.objects.create(
+                                        Paciente=tratamiento.paciente,
+                                        Medico=tratamiento.medico,
+                                        fecha_hora=fecha_atencion,
+                                        id_externo=id_turno,
+                                    )
+                                    
+                                else:
+                                    logger.warning(
+                                        f"⚠️ No se pudo reservar turno {id_turno}. "
+                                        f"Status {resp.status_code}: {resp.text}"
+                                    )
+                            except Exception as e:
+                                logger.error(f"❌ Error al reservar turno {id_turno}: {e}")
+                            
+                    except Exception as e:
+                        logger.warning(f"⚠️ Fecha de monitoreo inválida: {fecha_str}. Error: {e}")
 
                 # ---------- 6️⃣ Actualizar Resultados de Estudios ----------
                 for est in estudios:
