@@ -373,7 +373,67 @@ class Command(BaseCommand):
                 )
 
         # =====================================
-        # 7. RESUMEN
+        # 6. CREAR PUNCIONES Y OVOCITOS (datos de prueba)
+        # =====================================
+        self.stdout.write('\n🩺 Creando punciones y ovocitos de ejemplo...')
+        from Puncion.models import Puncion
+        from Ovocito.models import Ovocito
+        from Historial_ovocito.models import HistorialOvocito
+
+        created_punciones = 0
+        created_ovocitos = 0
+        created_historial = 0
+
+        for i, tratamiento in enumerate(tratamientos):
+            paciente = tratamiento.paciente
+            # crear una punción asociada al tratamiento/paciente
+            fecha_puncion = timezone.now().date() - timedelta(days=10 + i)
+            puncion = Puncion.objects.create(
+                paciente=paciente,
+                fecha=fecha_puncion,
+                quirofano=f'Quirófano {chr(65 + (i % 3))}'
+            )
+            created_punciones += 1
+            self.stdout.write(f'  ✅ Punción #{puncion.id} para {paciente.first_name} ({puncion.quirofano})')
+
+            # crear 3 ovocitos de ejemplo por punción
+            madurez_opts = ['maduro', 'inmaduro', 'muy_inmaduro']
+            tipo_opts = ['fresco', 'criopreservado']
+            for j in range(1, 4):
+                identificador = f"{paciente.id}-O-{j}"
+                ov = Ovocito.objects.create(
+                    paciente=paciente,
+                    puncion=puncion,
+                    identificador=identificador,
+                    madurez=madurez_opts[j % len(madurez_opts)],
+                    tipo_estado=tipo_opts[j % len(tipo_opts)]
+                )
+                created_ovocitos += 1
+                self.stdout.write(f'    - Ovocito {ov.identificador} (id {ov.id_ovocito})')
+
+                # Crear un pequeño historial de eventos para el ovocito
+                eventos = [
+                    ('recuperado', timezone.now() - timedelta(days=9 + j)),
+                    ('clasificado', timezone.now() - timedelta(days=8 + j)),
+                    ('fertilizado', timezone.now() - timedelta(days=7 + j)),
+                ]
+                for k, (estado, fecha_ev) in enumerate(eventos):
+                    ho = HistorialOvocito.objects.create(
+                        ovocito=ov,
+                        paciente=paciente,
+                        estado=estado,
+                        fecha=fecha_ev,
+                        nota=f'Evento {estado} automático de seed',
+                        usuario=medicos[0] if medicos else None
+                    )
+                    created_historial += 1
+
+        self.stdout.write(f'\n🔬 Punciones creadas: {created_punciones}')
+        self.stdout.write(f'🔵 Ovocitos creados: {created_ovocitos}')
+        self.stdout.write(f'📝 Eventos de historial creados: {created_historial}\n')
+
+        # =====================================
+        # 6. RESUMEN
         # =====================================
         self.stdout.write(self.style.SUCCESS('\n' + '='*60))
         self.stdout.write(self.style.SUCCESS('✅ BASE DE DATOS INICIALIZADA'))

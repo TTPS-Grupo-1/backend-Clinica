@@ -7,13 +7,18 @@ class Fenotipo(models.Model):
 	Campos basados en el formulario: color de ojos, color de pelo, tipo de pelo,
 	altura en centímetros, complexión corporal y rasgos étnicos generales.
 	"""
-
 	COMPLEXION_CHOICES = [
 		("delgada", "Delgada"),
 		("normal", "Normal"),
 		("robusta", "Robusta"),
 		("otra", "Otra"),
 	]
+ 
+	PERSONA_CHOICES = [
+		("PACIENTE", "Paciente"),
+		("ACOMPAÑANTE", "Acompañante"),
+	]
+
 
 	color_ojos = models.CharField(
 		"color de ojos",
@@ -61,6 +66,13 @@ class Fenotipo(models.Model):
 			PrimeraConsulta,
 			on_delete=models.CASCADE,
 			related_name="fenotipos"
+	)
+ 
+	persona = models.CharField(
+		"persona",
+		max_length=16,
+		choices=PERSONA_CHOICES,
+		default="PACIENTE",
 	)
  
     

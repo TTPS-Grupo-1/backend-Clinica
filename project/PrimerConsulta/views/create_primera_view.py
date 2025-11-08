@@ -247,6 +247,17 @@ class CreatePrimeraConsultaMixin:
                 'rasgos_etnicos': fenotipo_data.get('etnia'),
             }
             print("fenotipo:", fenotipo_payload)
+            
+            fenotipo_data2 = form.get('fenotipo2', {}) or {}
+            fenotipo_payload2 = {
+                'color_ojos': fenotipo_data2.get('ojos'),
+                'color_pelo': fenotipo_data2.get('peloColor'),
+                'tipo_pelo': fenotipo_data2.get('peloTipo'),
+                'altura_cm': safe_int(fenotipo_data2.get('altura')),
+                'complexion_corporal': fenotipo_data2.get('complexion'),
+                'rasgos_etnicos': fenotipo_data2.get('etnia'),
+            }
+            print("fenotipo 2:", fenotipo_payload2)
 
         except Exception as e:
             print("🔥 Error en bloque fenotipo:", type(e).__name__, e)
@@ -324,10 +335,11 @@ class CreatePrimeraConsultaMixin:
                     AntecedentesPersonales.objects.create(consulta=consulta, **antecedentes_personales_payload2)
                     
                 if fenotipo_payload and any(v not in [None, ""] for v in fenotipo_payload.values()):
-                    Fenotipo.objects.create(consulta=consulta, **fenotipo_payload)
+                    Fenotipo.objects.create(consulta=consulta, **fenotipo_payload, persona="PACIENTE")
 
-                
-                
+                if fenotipo_payload2 and any(v not in [None, ""] for v in fenotipo_payload2.values()):
+                    Fenotipo.objects.create(consulta=consulta, **fenotipo_payload2, persona="ACOMPAÑANTE")
+
                 if estudios_ginecologicos_1:
                     for estudio_nombre in estudios_ginecologicos_1:
                         ResultadoEstudio.objects.create(

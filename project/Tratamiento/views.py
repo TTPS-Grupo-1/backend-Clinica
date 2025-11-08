@@ -12,7 +12,7 @@ class TratamientoViewSet(viewsets.ModelViewSet):
     ViewSet para manejar operaciones CRUD de tratamientos.
     """
     queryset = Tratamiento.objects.all()
-    permission_classes = []
+    permission_classes = [IsAuthenticated]
     
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -22,21 +22,35 @@ class TratamientoViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filtrar tratamientos según el rol del usuario"""
         user = self.request.user
+        # Posible filtro por query param 'medico' para permitir consultas dirigidas desde el frontend
+        medico_param = self.request.query_params.get('medico')
+
         queryset = Tratamiento.objects.all()
-        
-        if user.rol == 'paciente':
-            # Los pacientes solo ven sus propios tratamientos
-            queryset = queryset.filter(paciente=user)
-        elif user.rol == 'medico':
-            # Los médicos ven tratamientos que han asignado o de sus pacientes
-            queryset = queryset.filter(Q(medico=user) | Q(paciente__medico_tratante=user))
-        
+
+        if medico_param:
+            # Si se solicita, devolver tratamientos asociados al medico indicado (por id)
+            try:
+                medico_id = int(medico_param)
+                # Filtrar por el campo 'medico' del tratamiento (relación directa)
+                queryset = queryset.filter(medico_id=medico_id)
+            except (ValueError, TypeError):
+                # si el parámetro no es válido, devolvemos vacío
+                return Tratamiento.objects.none()
+        else:
+            # Filtrado por rol por defecto (usar valores de rol en mayúsculas)
+            if user.rol == 'PACIENTE':
+                # Los pacientes solo ven sus propios tratamientos
+                queryset = queryset.filter(paciente=user)
+            elif user.rol == 'MEDICO':
+                # Los médicos ven tratamientos que han asignado
+                queryset = queryset.filter(medico=user)
+
         return queryset.select_related('paciente', 'medico')
     
     @action(detail=False, methods=['get'])
     def mis_tratamientos(self, request):
         """Endpoint para obtener tratamientos del usuario actual (si es paciente)"""
-        if request.user.rol != 'paciente':
+        if request.user.rol != 'PACIENTE':
             return Response(
                 {'error': 'Este endpoint es solo para pacientes'}, 
                 status=status.HTTP_403_FORBIDDEN
@@ -77,3 +91,35 @@ class TratamientoViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(tratamiento)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+    
+    @action(detail=True, methods=["patch"])
+    def cancelar(self, request, pk=None):
+        try:
+            tratamiento = self.get_object()
+            motivo = request.data.get("motivo_cancelacion", "").strip()
+
+            if not motivo:
+                return Response(
+                    {"error": "Debe proporcionar un motivo de cancelación."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            tratamiento.activo = False
+            tratamiento.motivo_finalizacion = motivo
+            tratamiento.save(update_fields=["activo", "motivo_finalizacion"])
+
+            return Response(
+                {"success": True, "message": "Tratamiento cancelado correctamente."},
+                status=status.HTTP_200_OK,
+            )
+
+        except Tratamiento.DoesNotExist:
+            return Response(
+                {"error": "Tratamiento no encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Error al cancelar el tratamiento: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
