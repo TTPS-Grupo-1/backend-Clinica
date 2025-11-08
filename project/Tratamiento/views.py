@@ -23,13 +23,13 @@ class TratamientoViewSet(viewsets.ModelViewSet):
         """Filtrar tratamientos según el rol del usuario"""
         user = self.request.user
         queryset = Tratamiento.objects.all()
-        
-        if user.rol == 'paciente':
+
+        if user.rol == 'PACIENTE':
             # Los pacientes solo ven sus propios tratamientos
             queryset = queryset.filter(paciente=user)
-        elif user.rol == 'medico':
+        elif user.rol == 'MEDICO':
             # Los médicos ven tratamientos que han asignado o de sus pacientes
-            queryset = queryset.filter(Q(medico=user) | Q(paciente__medico_tratante=user))
+            queryset = queryset.filter(Q(medico=user))
         
         return queryset.select_related('paciente', 'medico')
     
@@ -77,3 +77,35 @@ class TratamientoViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(tratamiento)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
+    
+    @action(detail=True, methods=["patch"])
+    def cancelar(self, request, pk=None):
+        try:
+            tratamiento = self.get_object()
+            motivo = request.data.get("motivo_cancelacion", "").strip()
+
+            if not motivo:
+                return Response(
+                    {"error": "Debe proporcionar un motivo de cancelación."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            tratamiento.activo = False
+            tratamiento.motivo_finalizacion = motivo
+            tratamiento.save(update_fields=["activo", "motivo_finalizacion"])
+
+            return Response(
+                {"success": True, "message": "Tratamiento cancelado correctamente."},
+                status=status.HTTP_200_OK,
+            )
+
+        except Tratamiento.DoesNotExist:
+            return Response(
+                {"error": "Tratamiento no encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Error al cancelar el tratamiento: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

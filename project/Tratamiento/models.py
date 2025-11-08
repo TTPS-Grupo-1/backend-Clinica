@@ -15,6 +15,10 @@ class Tratamiento(models.Model):
         limit_choices_to={'rol': 'paciente'},
         help_text="Paciente al que se le asigna este tratamiento"
     )
+    motivo_finalizacion = models.TextField(
+        blank=True,
+        help_text="Motivo por el cual se finalizó el tratamiento"
+    )
     objetivo = models.TextField(
         blank=True,
         help_text="Descripción detallada del tratamiento"
