@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     'Chatbot',
     'Tratamiento',
     'Transferencia',
+    'Historial_ovocito',
     'seed_data',  # ✅ Agregar al final
 ]
 
