@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Órdenes médicas</title>
+</head>
+<body>
+  <h2>Hola {{ paciente.first_name }},</h2>
+  <p>Estas son las órdenes médicas generadas durante tu consulta.</p>
+
+  <ul>
+    {% for orden in ordenes %}
+      <li>
+        <strong>{{ orden.tipo_estudio }}</strong>:
+        <a href="{{ orden.pdf_url }}" target="_blank">Descargar PDF</a>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <p>Por favor descargalas y presentalas en el laboratorio correspondiente.</p>
+  <br>
+  <p>Atentamente,<br><strong>Clínica Médica Integral</strong></p>
+</body>
+</html>
