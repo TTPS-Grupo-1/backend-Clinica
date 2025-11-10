@@ -46,7 +46,7 @@ class CustomUser(AbstractUser):
         ('PACIENTE', 'Paciente'),
         ('MEDICO', 'Médico'),
         ('ADMIN', 'Administrativo'),
-        ('LAB_OPERATOR', 'Operador de laboratorio'),
+        ('OPERADOR_LABORATORIO', 'Operador de laboratorio'),
         ('DIRECTOR_MEDICO', 'Director Médico'),
     ]
 

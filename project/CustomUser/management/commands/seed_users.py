@@ -202,7 +202,7 @@ class Command(BaseCommand):
                 'last_name': 'Laboratorio',
                 'dni': '30405060',
                 'telefono': '1153210987',
-                'rol': 'LAB_OPERATOR',
+                'rol': 'OPERADOR_LABORATORIO',
                 'password': 'lab123'
             }
         ]
