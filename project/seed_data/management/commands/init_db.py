@@ -1,6 +1,8 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from datetime import timedelta
+import re
+import secrets
 from CustomUser.models import CustomUser
 from Tratamiento.models import Tratamiento
 from Monitoreo.models import Monitoreo
@@ -20,7 +22,8 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('🗑️  Eliminando datos existentes...'))
             Monitoreo.objects.all().delete()
             Tratamiento.objects.all().delete()
-            CustomUser.objects.filter(rol__in=['PACIENTE', 'MEDICO']).delete()
+            # eliminar pacientes, medicos y operadores de laboratorio en --clear
+            CustomUser.objects.filter(rol__in=['PACIENTE', 'MEDICO', 'OPERADOR_LABORATORIO']).delete()
             self.stdout.write(self.style.SUCCESS('✅ Datos eliminados'))
 
         self.stdout.write(self.style.SUCCESS('\n🚀 Iniciando creación de datos...\n'))
@@ -124,6 +127,41 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(f'  ⚠️  {paciente.first_name} {paciente.last_name} (ya existía)')
             pacientes.append(paciente)
+
+        # =====================================
+        # 3.5 CREAR OPERADORES DE LABORATORIO
+        # =====================================
+        self.stdout.write('\n🧪 Creando operadores de laboratorio...')
+        operadores_data = [
+            {
+                'email': 'operador.lab@clinica.com',
+                'first_name': 'Operador',
+                'last_name': 'Laboratorio',
+                'dni': 33123456,
+                'telefono': '2214000000',
+            },
+        ]
+
+        operadores = []
+        for data in operadores_data:
+            operador, created = CustomUser.objects.get_or_create(
+                email=data['email'],
+                defaults={
+                    'first_name': data['first_name'],
+                    'last_name': data['last_name'],
+                    'dni': data['dni'],
+                    'telefono': data['telefono'],
+                    'rol': 'OPERADOR_LABORATORIO',
+                    'is_active': True,
+                }
+            )
+            if created:
+                operador.set_password('labpass123')
+                operador.save()
+                self.stdout.write(f'  ✅ {operador.first_name} {operador.last_name}')
+            else:
+                self.stdout.write(f'  ⚠️  {operador.first_name} {operador.last_name} (ya existía)')
+            operadores.append(operador)
 
         # =====================================
         # 3. CREAR TRATAMIENTOS CON PRIMERA CONSULTA Y DATOS ASOCIADOS
@@ -396,34 +434,65 @@ class Command(BaseCommand):
             created_punciones += 1
             self.stdout.write(f'  ✅ Punción #{puncion.id} para {paciente.first_name} ({puncion.quirofano})')
 
-            # crear 3 ovocitos de ejemplo por punción
+            # crear 5 ovocitos de ejemplo por punción con diferentes estados
             madurez_opts = ['maduro', 'inmaduro', 'muy_inmaduro']
-            tipo_opts = ['fresco', 'criopreservado']
-            for j in range(1, 4):
-                identificador = f"{paciente.id}-O-{j}"
+            # Estados: mayoría frescos, algunos criopreservados, pocos fertilizados
+            estados = ['fresco', 'descartado', 'criopreservado', 'fertilizado']
+            
+            for j in range(1, 6):  # Crear 5 ovocitos por punción
+                # Usar identificador con prefijo OVO y formato solicitado:
+                # OVO_<3letrasApellido>_<3letrasNombre>_<7digitosAleatorios>
+                def _three_letters(s: str) -> str:
+                    clean = re.sub(r'[^A-Za-z]', '', (s or ''))
+                    clean = clean.upper()
+                    return (clean + 'XXX')[:3]
+
+                suffix = str(secrets.randbelow(10**7)).zfill(7)
+                identificador = f"OVO_{_three_letters(paciente.last_name)}_{_three_letters(paciente.first_name)}_{suffix}"
+                # Asegurar unicidad regenerando sufijo si choca
+                from Ovocito.models import Ovocito as _OvocitoCheck
+                while _OvocitoCheck.objects.filter(identificador=identificador).exists():
+                    suffix = str(secrets.randbelow(10**7)).zfill(7)
+                    identificador = f"OVO_{_three_letters(paciente.last_name)}_{_three_letters(paciente.first_name)}_{suffix}"
+                # Si la lista de estados tiene menos de 5 elementos, ciclarla en vez de indexar fuera de rango
+                estado_ovocito = estados[(j-1) % len(estados)]  # Usar el estado correspondiente de forma segura
+
                 ov = Ovocito.objects.create(
                     paciente=paciente,
                     puncion=puncion,
                     identificador=identificador,
-                    madurez=madurez_opts[j % len(madurez_opts)],
-                    tipo_estado=tipo_opts[j % len(tipo_opts)]
+                    madurez=madurez_opts[(j-1) % len(madurez_opts)],
+                    tipo_estado=estado_ovocito
                 )
                 created_ovocitos += 1
-                self.stdout.write(f'    - Ovocito {ov.identificador} (id {ov.id_ovocito})')
+                self.stdout.write(f'    - Ovocito {ov.identificador} (id {ov.id_ovocito}) - Estado: {estado_ovocito}')
 
-                # Crear un pequeño historial de eventos para el ovocito
-                eventos = [
-                    ('recuperado', timezone.now() - timedelta(days=9 + j)),
-                    ('clasificado', timezone.now() - timedelta(days=8 + j)),
-                    ('fertilizado', timezone.now() - timedelta(days=7 + j)),
-                ]
+                # Crear historial según el estado del ovocito
+                if estado_ovocito == 'fertilizado':
+                    # Para ovocitos fertilizados, historial completo
+                    eventos = [
+                        ('fresco', timezone.now() - timedelta(days=9 + j)),
+                        ('fertilizado', timezone.now() - timedelta(days=7 + j)),
+                    ]
+                elif estado_ovocito == 'criopreservado':
+                    # Para criopreservados
+                    eventos = [
+                        ('fresco', timezone.now() - timedelta(days=9 + j)),
+                        ('criopreservado', timezone.now() - timedelta(days=7 + j)),
+                    ]
+                else:  # fresco o descartado
+                    # Para frescos, solo el estado actual
+                    eventos = [
+                        (estado_ovocito, timezone.now() - timedelta(days=9 + j)),
+                    ]
+                
                 for k, (estado, fecha_ev) in enumerate(eventos):
                     ho = HistorialOvocito.objects.create(
                         ovocito=ov,
                         paciente=paciente,
                         estado=estado,
                         fecha=fecha_ev,
-                        nota=f'Evento {estado} automático de seed',
+                        nota=f'Ovocito en estado {estado}',
                         usuario=medicos[0] if medicos else None
                     )
                     created_historial += 1
@@ -452,6 +521,12 @@ class Command(BaseCommand):
         self.stdout.write('\n  Pacientes:')
         for paciente in pacientes:
             self.stdout.write(f'    - {paciente.email}')
+        
+        # Mostrar operadores de laboratorio
+        if 'operadores' in locals() and operadores:
+            self.stdout.write('\n  Operadores de laboratorio:')
+            for op in operadores:
+                self.stdout.write(f'    - {op.email}')
         
         # Mostrar URLs de monitoreos pendientes
         monitoreos_pendientes = Monitoreo.objects.filter(atendido=False)[:3]

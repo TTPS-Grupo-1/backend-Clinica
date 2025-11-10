@@ -74,7 +74,7 @@ python manage.py seed_users --clear
 | Email | Nombre | Password | Rol |
 |-------|--------|----------|-----|
 | admin@clinicaenvy.com | Carmen Administradora | `admin123` | ADMIN |
-| laboratorio@clinicaenvy.com | Técnico Laboratorio | `lab123` | LAB_OPERATOR |
+| laboratorio@clinicaenvy.com | Técnico Laboratorio | `lab123` | OPERADOR_LABORATORIO |
 
 ## 🚀 Uso Recomendado
 
