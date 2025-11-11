@@ -18,12 +18,15 @@ class TurnoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Turno
-        # ⚠️ Debe usar los nombres de las variables declaradas: 'medico' y 'Paciente'
+        # ✅ CAMPOS AGREGADOS: cancelado, atendido, y es_monitoreo
         fields = [
             'id', 
-            'medico',       
-            'Paciente',     
-            'fecha_hora',
-            'motivo'
-            # 'estado' si quieres mostrarlo
+            'medico',           
+            'Paciente',         
+            'fecha_hora',       
+            'id_externo',       
+            'cancelado',        
+            'atendido',         
+            'es_monitoreo',     
+            'created_at',       
         ]

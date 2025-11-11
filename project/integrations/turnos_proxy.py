@@ -218,20 +218,16 @@ def turnos_proxy_get_turnos_paciente(request):
     if request.method != 'GET':
         return JsonResponse({"success": False, "error": "Método no permitido. Use GET."}, status=405)
 
-    # 1. Obtener el ID del paciente del frontend
     id_paciente = request.GET.get('id_paciente')
 
     if not id_paciente:
         return JsonResponse({
-            "success": False, 
+            "success": False,
             "error": "Falta el parámetro requerido: id_paciente."
         }, status=400)
 
-    # 2. Configurar Autenticación
     token = request.headers.get('Authorization', AUTH_TOKEN)
     
-    # 3. Construir la URL para get_turnos_paciente
-    # 🚨 NOTA CLAVE: Usamos el endpoint '/get_turnos_paciente'
     url = f"{API_BASE_URL}/get_turnos_paciente?id_paciente={id_paciente}"
     
     headers = {
@@ -239,16 +235,33 @@ def turnos_proxy_get_turnos_paciente(request):
         "Content-Type": "application/json",
     }
     
-    # 4. Ejecutar Petición
     try:
         resp = requests.get(url, headers=headers, timeout=10)
-        # Devolver la respuesta de la API externa (incluyendo 200 OK y errores 400)
-        return JsonResponse(resp.json(), status=resp.status_code, safe=False)
-        
-    except requests.exceptions.RequestException as e:
-        return JsonResponse({"success": False, "error": f"Error de conexión con la API externa: {str(e)}"}, status=502)
+
+        api_data = resp.json().get("data", [])
+
+        # --- Mezclar con DB local ---
+        from Turnos.models import Turno
+
+        enriched_data = []
+        for t in api_data:
+            turno_local = Turno.objects.filter(id_externo=t["id"]).first()
+
+            # Si existe en tu base, reemplazamos es_monitoreo
+            if turno_local:
+                t["es_monitoreo"] = bool(turno_local.es_monitoreo)
+            else:
+                t["es_monitoreo"] = False  # o lo que quieras por default
+
+            enriched_data.append(t)
+
+        return JsonResponse({"success": True, "data": enriched_data}, status=200)
+
     except Exception as e:
-        return JsonResponse({"success": False, "error": f"Error interno del proxy: {str(e)}"}, status=500)
+        return JsonResponse(
+            {"success": False, "error": f"Error interno del proxy: {str(e)}"},
+            status=500
+        )
 
 # ---------------------------------------------------------------------------------------------------
 # 6. Proxy para PATCH /cancelar_turno (Libera el turno en la API y marca el turno cancelado local.).
