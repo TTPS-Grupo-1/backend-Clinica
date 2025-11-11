@@ -17,3 +17,26 @@ class EmbrionViewSet(CreateEmbrionMixin, UpdateEmbrionMixin, viewsets.ModelViewS
         from rest_framework import status
         from rest_framework.response import Response
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def get_queryset(self):
+        # ✅ REEMPLAZAR todo el método get_queryset por esto:
+        queryset = Embrion.objects.select_related(
+            'fertilizacion',
+            'fertilizacion__ovocito',
+            'fertilizacion__ovocito__paciente'
+        ).all()
+        
+        paciente_id = self.request.query_params.get('paciente', None)
+        
+        if paciente_id:
+            try:
+                paciente_id = int(paciente_id)
+                queryset = queryset.filter(
+                    fertilizacion__isnull=False,
+                    fertilizacion__ovocito__isnull=False,
+                    fertilizacion__ovocito__paciente__id=paciente_id
+                )
+            except (ValueError, TypeError):
+                queryset = queryset.none()
+        
+        return queryset.distinct()    
