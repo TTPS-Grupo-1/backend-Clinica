@@ -1,6 +1,6 @@
 from rest_framework import viewsets, permissions
 from .models import Transferencia
-from .serializers import TransferenciaSerializer, EmbrionSimpleSerializer
+from .serializers import TransferenciaSerializer, EmbrionSimpleSerializer, TransferenciaReadSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from Embrion.models import Embrion
@@ -33,3 +33,30 @@ class TransferenciaViewSet(viewsets.ModelViewSet):
         embriones = Embrion.objects.filter(fertilizacion__ovocito__paciente=paciente)
         serializer = EmbrionSimpleSerializer(embriones, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='bulk_create')
+    def bulk_create(self, request):
+        """Accepts payload: {"tratamiento": <id>, "embriones": [{"embrion": id, "estado": ..., ...}, ...]}
+        Creates multiple Transferencia rows (one per embryo) in a transaction and returns them.
+        """
+        tratamiento_id = request.data.get('tratamiento')
+        embriones_payload = request.data.get('embriones', [])
+        if not tratamiento_id or not isinstance(embriones_payload, list) or len(embriones_payload) == 0:
+            return Response({'detail': 'tratamiento and embriones (non-empty list) are required.'}, status=400)
+
+        try:
+            tratamiento = Tratamiento.objects.get(pk=tratamiento_id)
+        except Tratamiento.DoesNotExist:
+            return Response({'detail': 'Tratamiento no encontrado.'}, status=404)
+
+        # Permitido: el owner del tratamiento, personal o médicos (se pueden añadir checks)
+        user = request.user
+
+        # Delegate creation to the serializer which will create one Transferencia and N TransferenciaEmbrion
+        data = request.data.copy()
+        serializer = TransferenciaSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        transferencia = serializer.save()
+
+        out = TransferenciaReadSerializer(transferencia)
+        return Response(out.data, status=201)
