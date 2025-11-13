@@ -1,7 +1,6 @@
 from django.db import models
 from CustomUser.models import CustomUser
 from PrimerConsulta.models import PrimeraConsulta
-from Transferencia.models import Transferencia
 from Puncion.models import Puncion
 from Turnos.models import Turno
 class Tratamiento(models.Model):
@@ -59,7 +58,7 @@ class Tratamiento(models.Model):
         help_text="Segunda consulta asociada al tratamiento"
     )
     transferencia = models.OneToOneField(
-        Transferencia,
+        'Transferencia.Transferencia',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -88,4 +87,5 @@ class Tratamiento(models.Model):
         ordering = ['-fecha_creacion']
 
     def __str__(self):
-        return f"{self.nombre} - {self.paciente.get_full_name() or self.paciente.username}"
+        # `nombre` no existe en este modelo; usar id y paciente para evitar AttributeError
+        return f"Tratamiento #{self.id} - {self.paciente.get_full_name() or self.paciente.username}"
