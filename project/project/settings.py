@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     'Transferencia',
     'Historial_ovocito',
     'seed_data',  # ✅ Agregar al final
+    'Historial_embrion',
 ]
 
 AUTH_USER_MODEL = 'CustomUser.CustomUser'
