@@ -1,7 +1,10 @@
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import HistorialEmbrionViewSet
 
 router = DefaultRouter()
-router.register(r'', HistorialEmbrionViewSet, basename='historial_embrion')
+router.register(r'historial-embriones', HistorialEmbrionViewSet, basename='historial-embrion')
 
-urlpatterns = router.urls
+urlpatterns = [
+    path('', include(router.urls)),
+]

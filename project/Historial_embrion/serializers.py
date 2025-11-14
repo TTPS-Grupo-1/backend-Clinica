@@ -9,7 +9,11 @@ class HistorialEmbrionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = HistorialEmbrion
-        fields = ['id', 'embrion', 'embrion_identificador', 'paciente', 'estado', 'fecha', 'nota', 'usuario', 'usuario_rep']
+        fields = [
+            'id', 'embrion', 'embrion_identificador', 'paciente', 'estado',
+            'calidad', 'fecha', 'fecha_modificacion', 'nota', 'observaciones',
+            'tipo_modificacion', 'usuario', 'usuario_rep'
+        ]
         read_only_fields = ['id', 'fecha', 'usuario_rep', 'embrion_identificador']
 
     def get_embrion_identificador(self, obj):
