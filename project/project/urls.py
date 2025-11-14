@@ -35,7 +35,7 @@ urlpatterns = [
     path('api/', include('Fertilizacion.urls')),
     path('api/login/', LoginAPIView.as_view(), name='login'),
     path('api/logout/', LogoutAPIView.as_view(), name='logout'),
-    path('api/', include('Turnos.urls')),
+
     path('api/almacenamiento/', almacenamiento_proxy),
     #path('api/turnos/', turnos_proxy),
     #path('turnos/consultar/', turnos_proxy_get, name='turnos_get_proxy'),
@@ -53,9 +53,9 @@ urlpatterns = [
     path('api/transferencia/', include('Transferencia.urls')),
     path('api/resultado_estudio/', include('ResultadoEstudio.urls')),
     # Historial de ovocitos
-    path('api/', include('Historial_ovocito.urls')),
-    # Historial de embriones
-    path('api/', include('Historial_embrion.urls')),
+    path('api/historial_ovocitos/', include('Historial_ovocito.urls')),
+    path('api/', include('Turnos.urls')),
+    path('api/', include('Historial_embrion.urls'))
 ]
 
 if settings.DEBUG:
