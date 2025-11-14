@@ -24,30 +24,15 @@ class IsMedicoOrOwnerReadOnly(permissions.BasePermission):
         return self.has_permission(request, view)
 
 
-class HistorialEmbrionViewSet(viewsets.ModelViewSet):
-    queryset = HistorialEmbrion.objects.select_related('embrion', 'paciente', 'usuario').all()
+class HistorialEmbrionViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = HistorialEmbrionSerializer
-    permission_classes = [IsMedicoOrOwnerReadOnly]
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['estado', 'nota']
+    queryset = HistorialEmbrion.objects.all()
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        paciente = self.request.query_params.get('paciente')
-        embrion = self.request.query_params.get('embrion')
-        if paciente:
-            qs = qs.filter(paciente_id=paciente)
-        if embrion:
-            qs = qs.filter(embrion_id=embrion)
-        # Si el usuario es paciente, limitar a su propio paciente id
-        if getattr(self.request.user, 'rol', '') == 'PACIENTE':
-            qs = qs.filter(paciente_id=self.request.user.id)
-        return qs
+        queryset = super().get_queryset()
+        embrion_id = self.request.query_params.get('embrion', None)
 
-    def perform_create(self, serializer):
-        serializer.save(usuario=self.request.user)
-from django.shortcuts import render
+        if embrion_id:
+            queryset = queryset.filter(embrion=embrion_id)
 
-
-
-# Create your views here.
+        return queryset
