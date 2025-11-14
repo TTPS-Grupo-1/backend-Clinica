@@ -1,6 +1,8 @@
 from rest_framework import viewsets, permissions, filters
 from .models import HistorialOvocito
 from .serializers import HistorialOvocitoSerializer
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 
 class IsMedicoOrOwnerReadOnly(permissions.BasePermission):
@@ -46,6 +48,21 @@ class HistorialOvocitoViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(usuario=self.request.user)
+    
+    @action(detail=False, methods=["get"], url_path=r"por-ovocito/(?P<ovocito_id>[^/.]+)")
+    def por_ovocito(self, request, ovocito_id=None):
+        """Lista los historiales filtrados por el id de ovocito pasado en la URL.
+
+        Ruta resultante: /api/historial_ovocitos/por-ovocito/<ovocito_id>/
+        Esto es útil cuando querés pasar el id como parte del path en vez de query-string.
+        """
+        qs = self.filter_queryset(self.get_queryset().filter(ovocito_id=ovocito_id))
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
 from django.shortcuts import render
 
 # Create your views here.

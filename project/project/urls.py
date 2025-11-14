@@ -53,7 +53,7 @@ urlpatterns = [
     path('api/transferencia/', include('Transferencia.urls')),
     path('api/resultado_estudio/', include('ResultadoEstudio.urls')),
     # Historial de ovocitos
-    path('api/', include('Historial_ovocito.urls')),
+    path('api/historial_ovocitos/', include('Historial_ovocito.urls')),
 ]
 
 if settings.DEBUG:
