@@ -149,15 +149,23 @@ class TratamientoViewSet(viewsets.ModelViewSet):
 
             # Obtener embriones relacionados a esas fertilizaciones
             print(f"🔍 DEBUG: Obteniendo embriones...")
-            embriones_data = []
-            if fertilizaciones_data:
-                fertilizaciones_ids = [f.get('id') for f in fertilizaciones_data if f.get('id')]
-                print(f"🔍 DEBUG: IDs de fertilizaciones para buscar embriones: {fertilizaciones_ids}")
-                if fertilizaciones_ids:
-                    embriones = Embrion.objects.filter(fertilizacion__in=fertilizaciones_ids)
-                    print(f"🔍 DEBUG: Encontrados {embriones.count()} embriones")
-                    embriones_data = EmbrionSerializer(embriones, many=True).data
-                    print(f"🔍 DEBUG: Embriones serializados: {len(embriones_data)} items")
+
+            # ✅ Acceder desde las fertilizaciones usando el related_name
+            embriones = []
+            for fert in fertilizaciones:
+                try:
+                    embriones.append(fert.embrion)  # ✅ 'embrion' es el related_name
+                except Embrion.DoesNotExist:
+                    print(f"  ⚠️ Fertilización {fert.id} no tiene embrión")
+                    pass
+
+            print(f"🔍 DEBUG: Encontrados {len(embriones)} embriones")
+
+            for e in embriones:
+                print(f"  ✅ Embrión ID={e.id}, identificador={e.identificador}, fertilizacion_id={e.fertilizacion_id}")
+
+            embriones_data = EmbrionSerializer(embriones, many=True).data
+            print(f"🔍 DEBUG: Embriones serializados: {len(embriones_data)} items")
 
             print(f"🔍 DEBUG: Preparando respuesta final...")
             response_data = {
