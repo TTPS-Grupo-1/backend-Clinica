@@ -55,7 +55,7 @@ urlpatterns = [
     # Historial de ovocitos
     path('api/historial_ovocitos/', include('Historial_ovocito.urls')),
     path('api/', include('Turnos.urls')),
-    path('api/', include('Historial_embrion.urls'))
+    path('api/historial_embrion/', include('Historial_embrion.urls'))
 ]
 
 if settings.DEBUG:
