@@ -49,3 +49,30 @@ class HistorialEmbrion(models.Model):
 			embrion_ident = str(self.embrion_id)
 		return f"{embrion_ident} - {self.estado} @ {self.fecha}"
 
+class HistorialEmbrion(models.Model):
+    embrion = models.ForeignKey(
+        'Embrion.Embrion',
+        on_delete=models.CASCADE,
+        related_name='historial'
+    )
+    estado = models.CharField(max_length=50)
+    calidad = models.CharField(max_length=50, null=True, blank=True)  # ✅ Agregar
+    fecha_modificacion = models.DateTimeField(auto_now_add=True)
+    observaciones = models.TextField(null=True, blank=True)  # ✅ Agregar
+    tipo_modificacion = models.CharField(max_length=100, null=True, blank=True)  # ✅ Agregar
+    usuario = models.ForeignKey(
+        'CustomUser.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='historial_embrion_registrado'
+    )
+
+    class Meta:
+        ordering = ['-fecha_modificacion']
+        verbose_name = 'Historial de Embrión'
+        verbose_name_plural = 'Historiales de Embriones'
+
+    def __str__(self):
+        return f"Historial {self.embrion.identificador} - {self.tipo_modificacion} ({self.fecha_modificacion})"
+
