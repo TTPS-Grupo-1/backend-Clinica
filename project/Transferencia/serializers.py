@@ -3,6 +3,7 @@ from .models import Transferencia, TransferenciaEmbrion
 from Embrion.models import Embrion
 from Tratamiento.models import Tratamiento
 from django.db import transaction
+from Historial_embrion.models import HistorialEmbrion
 
 
 class EmbrionSimpleSerializer(serializers.ModelSerializer):
@@ -92,5 +93,23 @@ class TransferenciaSerializer(serializers.ModelSerializer):
                 }
                 item_obj = TransferenciaEmbrion.objects.create(**te_data)
                 created_items.append(item_obj)
+
+                # Registrar en historial_embrion
+                HistorialEmbrion.objects.create(
+                    embrion=embrion_obj,
+                    paciente=transferencia.tratamiento.paciente,
+                    estado='transferido',
+                    calidad=str(getattr(embrion_obj, 'calidad', '') or ''),
+                    nota=te_data.get('observaciones') or '',
+                    observaciones=te_data.get('observaciones') or '',
+                    tipo_modificacion='transferencia',
+                    usuario=te_data.get('realizado_por') or validated_data.get('realizado_por')
+                )
+
+                # Marcar embrión como transferido
+                # Evitar que el signal cree un historial duplicado: marcar flag temporal
+                embrion_obj.estado = 'transferido'
+                embrion_obj._skip_historial = True
+                embrion_obj.save()
 
         return transferencia

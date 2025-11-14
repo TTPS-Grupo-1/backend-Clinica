@@ -8,6 +8,8 @@ def registrar_historial_embrion(sender, instance, created, **kwargs):
     """
     Signal que registra en el historial cada vez que se crea o modifica un embrión
     """
+    if getattr(instance, '_skip_historial', False):
+        return
     if created:
         # Es un embrión nuevo
         tipo_modificacion = "Creación del embrión"
