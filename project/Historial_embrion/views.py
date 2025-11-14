@@ -1,6 +1,8 @@
 from rest_framework import viewsets, permissions, filters
 from .models import HistorialEmbrion
 from .serializers import HistorialEmbrionSerializer
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 
 class IsMedicoOrOwnerReadOnly(permissions.BasePermission):
@@ -24,15 +26,43 @@ class IsMedicoOrOwnerReadOnly(permissions.BasePermission):
         return self.has_permission(request, view)
 
 
-class HistorialEmbrionViewSet(viewsets.ReadOnlyModelViewSet):
+class HistorialEmbrionViewSet(viewsets.ModelViewSet):
+    queryset = HistorialEmbrion.objects.select_related('embrion', 'paciente', 'usuario').all()
     serializer_class = HistorialEmbrionSerializer
-    queryset = HistorialEmbrion.objects.all()
+    permission_classes = [IsMedicoOrOwnerReadOnly]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['estado', 'nota']
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-        embrion_id = self.request.query_params.get('embrion', None)
+        qs = super().get_queryset()
+        paciente = self.request.query_params.get('paciente')
+        embrion = self.request.query_params.get('embrion')
+        if paciente:
+            qs = qs.filter(paciente_id=paciente)
+        if embrion:
+            qs = qs.filter(embrion_id=embrion)
+        # Si el usuario es paciente, limitar a su propio paciente id
+        if getattr(self.request.user, 'rol', '') == 'PACIENTE':
+            qs = qs.filter(paciente_id=self.request.user.id)
+        return qs
 
-        if embrion_id:
-            queryset = queryset.filter(embrion=embrion_id)
+    def perform_create(self, serializer):
+        serializer.save(usuario=self.request.user)
+    
+    @action(detail=False, methods=["get"], url_path=r"por-embrion/(?P<embrion_id>[^/.]+)")
+    def por_embrion(self, request, embrion_id=None):
+        """Lista los historiales filtrados por el id de embrion pasado en la URL.
 
-        return queryset
+        Ruta resultante: /api/historial_embrion/por-embrion/<embrion_id>/
+        Esto es útil cuando querés pasar el id como parte del path en vez de query-string.
+        """
+        qs = self.filter_queryset(self.get_queryset().filter(embrion_id=embrion_id))
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
+from django.shortcuts import render
+
+# Create your views here.
