@@ -65,3 +65,37 @@ class TurnoViewSet(CreateTurnoMixin, viewsets.ModelViewSet):
                 {"detail": f"Error al buscar turno: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=False, methods=['get'], url_path='por-externos')
+    def por_externos(self, request):
+        """
+        Endpoint para obtener los turnos locales cuyo `id_externo` esté en la lista provista.
+        GET /api/local/turnos/por-externos/?ids=1,2,3&atendido=false
+        Parámetros:
+          - ids: lista separada por comas de id_externo (requerido para filtrar)
+          - atendido: 'true'|'false' (opcional) para filtrar por estado de atención
+        """
+        ids_param = request.query_params.get('ids')
+        atendido_param = request.query_params.get('atendido')
+        try:
+            qs = Turno.objects.all()
+            if ids_param:
+                # parsear lista de ids
+                try:
+                    ids_list = [int(x) for x in ids_param.split(',') if x.strip()]
+                except ValueError:
+                    return Response({'detail': 'ids debe ser una lista de enteros separados por comas.'}, status=status.HTTP_400_BAD_REQUEST)
+                qs = qs.filter(id_externo__in=ids_list)
+
+            if atendido_param is not None:
+                ap = atendido_param.lower()
+                if ap in ('true', '1'):
+                    qs = qs.filter(atendido=True)
+                elif ap in ('false', '0'):
+                    qs = qs.filter(atendido=False)
+
+            serializer = self.get_serializer(qs, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"❌ Error al filtrar turnos locales por externos: {e}")
+            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
