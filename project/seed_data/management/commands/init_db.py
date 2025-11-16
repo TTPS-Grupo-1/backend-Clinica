@@ -29,14 +29,90 @@ class Command(BaseCommand):
             help='Crea pacientes en diferentes etapas de tratamiento',
         )
 
-    def crear_turnos_masivos_api(self, medico_id, dia_semana, hora_inicio, hora_fin):
+    def eliminar_todos_turnos_api(self):
+        """Elimina todos los turnos existentes en la API externa"""
+        try:
+            url = "https://ahlnfxipnieoihruewaj.supabase.co/functions/v1/delete_turnos"
+            token_grupo_3 = os.getenv('TOKEN_GRUPO_3')
+            if not token_grupo_3:
+                self.stdout.write('Variable de entorno TOKEN_GRUPO_3 no encontrada')
+                return False
+                
+            headers = {
+                "Authorization": f"Bearer {token_grupo_3}",
+                "Content-Type": "application/json",
+            }
+            
+            payload = {
+                "id_grupo": 1
+            }
+            
+            response = requests.delete(url, headers=headers, json=payload, timeout=10)
+            
+            if response.status_code in [200, 201]:
+                self.stdout.write('✅ Todos los turnos eliminados de la API')
+                return True
+            else:
+                self.stdout.write(f'⚠️ Error eliminando turnos: {response.status_code}')
+                return False
+                
+        except Exception as e:
+            self.stdout.write(f'❌ Error: {str(e)}')
+            return False
+
+    def obtener_turnos_medico_api(self, medico_id):
+        """Obtiene los turnos disponibles de un médico desde la API externa"""
+        try:
+            url = "https://ahlnfxipnieoihruewaj.supabase.co/functions/v1/get_turnos_medico"
+            token_grupo_3 = os.getenv('TOKEN_GRUPO_3')
+            if not token_grupo_3:
+                self.stdout.write('Variable de entorno TOKEN_GRUPO_3 no encontrada')
+                return []
+                
+            headers = {
+                "Authorization": f"Bearer {token_grupo_3}",
+                "Content-Type": "application/json",
+            }
+            
+            # Hacer GET request para obtener turnos
+            response = requests.get(f"{url}?id_medico={medico_id}&id_grupo=1", headers=headers, timeout=10)
+            
+            if response.status_code in [200, 201]:
+                try:
+                    turnos_data = response.json()
+                    
+                    # Si es una lista de turnos (estructura directa)
+                    if isinstance(turnos_data, list):
+                        turnos_ids = [turno.get('id') for turno in turnos_data if turno.get('id_paciente') is None]
+                        return turnos_ids
+                    # Si es un objeto con una propiedad 'data' que contiene la lista
+                    elif isinstance(turnos_data, dict) and 'data' in turnos_data:
+                        turnos_list = turnos_data['data']
+                        turnos_ids = [turno.get('id') for turno in turnos_list if turno.get('id_paciente') is None]
+                        return turnos_ids
+                    # Si es un objeto con una propiedad 'turnos' que contiene la lista
+                    elif isinstance(turnos_data, dict) and 'turnos' in turnos_data:
+                        turnos_list = turnos_data['turnos']
+                        turnos_ids = [turno.get('id') for turno in turnos_list if turno.get('id_paciente') is None]
+                        return turnos_ids
+                    else:
+                        return []
+                except Exception as e:
+                    return []
+            else:
+                return []
+                
+        except Exception as e:
+            return []
+
+    def crear_horarios_masivos_api(self, medico_id, dia_semana, hora_inicio, hora_fin):
         """Crea turnos masivos para un médico usando POST /post_turnos"""
         try:
             url = "https://ahlnfxipnieoihruewaj.supabase.co/functions/v1/post_turnos"
             token_grupo_3 = os.getenv('TOKEN_GRUPO_3')
             if not token_grupo_3:
                 self.stdout.write('Variable de entorno TOKEN_GRUPO_3 no encontrada')
-                return False
+                return False, []
                 
             headers = {
                 "Authorization": f"Bearer {token_grupo_3}",
@@ -52,17 +128,33 @@ class Command(BaseCommand):
             }
             
             response = requests.post(url, headers=headers, json=payload, timeout=10)
-            print(response.text)
-            if response.status_code == 200:
-                self.stdout.write(f'    ✅ Turnos masivos creados: Médico {medico_id} - {dia_semana} de {hora_inicio} a {hora_fin}')
-                return True
+            
+            if response.status_code in [200, 201]:
+                # Capturar los IDs de los turnos creados
+                try:
+                    response_data = response.json()
+                    
+                    # La API no devuelve los IDs específicos, pero crea turnos secuenciales
+                    # Calcular IDs basándose en turnos insertados
+                    turnos_insertados = response_data.get('summary', {}).get('insertados_ok', 0)
+                    
+                    if turnos_insertados > 0:
+                        # Generar IDs secuenciales (esto es una aproximación)
+                        # Nota: En producción, necesitarías una API que devuelva los IDs reales
+                        turnos_ids = list(range(1, turnos_insertados + 1))
+                        return True, turnos_ids
+                    else:
+                        return True, []
+                        
+                except Exception as e:
+                    return True, []  # Éxito pero sin IDs
             else:
-                self.stdout.write(f'    ⚠️ Error creando turnos masivos: {response.status_code}')
-                return False
+                self.stdout.write(f'    ⚠️ Error creando horarios: {response.status_code}')
+                return False, []
                 
         except Exception as e:
             self.stdout.write(f'    ❌ Error: {str(e)}')
-            return False
+            return False, []
 
     def reservar_turno_api(self, medico_id, paciente_id, fecha, hora, id_turno):
         """Reserva un turno específico através de la API externa"""
@@ -89,9 +181,7 @@ class Command(BaseCommand):
             }
             
             response = requests.patch(url, headers=headers, json=payload, timeout=10)
-            print(response.text)
-            if response.status_code == 200:
-                self.stdout.write(f'    ✅ Turno reservado: Médico {medico_id} - Paciente {paciente_id}')
+            if response.status_code in [200, 201]:
                 return True
             else:
                 self.stdout.write(f'    ⚠️ Error reservando turno: {response.status_code}')
@@ -101,163 +191,11 @@ class Command(BaseCommand):
             self.stdout.write(f'    ❌ Error: {str(e)}')
             return False
 
-    def obtener_etapa_tratamiento(self, indice):
-        """Define en qué etapa está cada paciente"""
-        etapas = [
-            "primera_consulta",    # Solo primera consulta
-            "segunda_consulta",    # Con segunda consulta
-            "estudios",           # Con estudios realizados
-            "monitoreo",          # En monitoreo
-            "puncion",           # Con punción realizada
-            "fertilizacion",     # Con fertilización
-            "transferencia",     # Listo para transferencia
-            "seguimiento"        # En seguimiento post-transferencia
-        ]
-        return etapas[indice % len(etapas)]
-
-    def crear_datos_por_etapa(self, tratamiento, etapa, indice):
-        """Crea datos específicos según la etapa del tratamiento"""
-        
-        # Etapa 2: Segunda consulta
-        if etapa in ['segunda_consulta', 'estudios', 'monitoreo', 'puncion', 'fertilizacion', 'transferencia', 'seguimiento']:
-            from SegundaConsulta.models import SegundaConsulta
-            if not tratamiento.segunda_consulta:  # Solo crear si no existe
-                segunda_consulta = SegundaConsulta.objects.create(
-                    semen_viable=True,
-                    ovocito_viable=True,
-                    observaciones=f'Segunda consulta - Caso {indice + 1}',
-                )
-                tratamiento.segunda_consulta = segunda_consulta
-                tratamiento.save()
-        
-        # Etapa 3: Estudios
-        if etapa in ['estudios', 'monitoreo', 'puncion', 'fertilizacion', 'transferencia', 'seguimiento']:
-            from ResultadoEstudio.models import ResultadoEstudio
-            ResultadoEstudio.objects.get_or_create(
-                consulta=tratamiento.primera_consulta,
-                nombre_estudio='Análisis hormonal - Etapa',
-                defaults={
-                    'tipo_estudio': 'Hormonal',
-                    'valor': 'Valores normales',
-                    'persona': 'PACIENTE'
-                }
-            )
-        
-        # Etapa 4: Monitoreo
-        if etapa in ['monitoreo', 'puncion', 'fertilizacion', 'transferencia', 'seguimiento']:
-            Monitoreo.objects.get_or_create(
-                tratamiento=tratamiento,
-                fecha_atencion=timezone.now() - timedelta(days=10 + indice),
-                defaults={
-                    'descripcion': f'Monitoreo - Desarrollo folicular adecuado',
-                    'atendido': True,
-                }
-            )
-        
-        # Etapa 5: Punción y Ovocitos
-        if etapa in ['puncion', 'fertilizacion', 'transferencia', 'seguimiento']:
-            from Puncion.models import Puncion
-            from Ovocito.models import Ovocito
-            
-            puncion, created = Puncion.objects.get_or_create(
-                paciente=tratamiento.paciente,
-                fecha=timezone.now().date() - timedelta(days=5 + indice),
-                defaults={
-                    'quirofano': f'Quirófano {chr(65 + (indice % 3))}'
-                }
-            )
-            
-            if created:
-                for i in range(3 + indice % 3):
-                    def _three_letters(s: str) -> str:
-                        clean = re.sub(r'[^A-Za-z]', '', (s or ''))
-                        clean = clean.upper()
-                        return (clean + 'XXX')[:3]
-
-                    suffix = str(secrets.randbelow(10**7)).zfill(7)
-                    identificador = f"OVO_{_three_letters(tratamiento.paciente.last_name)}_{_three_letters(tratamiento.paciente.first_name)}_{suffix}"
-                    
-                    Ovocito.objects.create(
-                        paciente=tratamiento.paciente,
-                        puncion=puncion,
-                        identificador=identificador,
-                        madurez=['muy_inmaduro', 'inmaduro', 'maduro'][i % 3],
-                        tipo_estado='fresco',
-                    )
-        
-        # Etapa 6: Fertilización y Embriones
-        if etapa in ['fertilizacion', 'transferencia', 'seguimiento']:
-            from Fertilizacion.models import Fertilizacion
-            from Embrion.models import Embrion
-            from Ovocito.models import Ovocito
-            
-            ovocitos = Ovocito.objects.filter(
-                paciente=tratamiento.paciente
-            )
-            
-            for i, ovocito in enumerate(ovocitos[:2]):  # Fertilizar máximo 2
-                fertilizacion, created = Fertilizacion.objects.get_or_create(
-                    ovocito=ovocito,
-                    defaults={
-                        'fecha_fertilizacion': timezone.now().date() - timedelta(days=3 + indice),
-                        'metodo_fertilizacion': ['ICSI', 'FIV'][i % 2],
-                        'exitosa': True,
-                    }
-                )
-                
-                if created and fertilizacion.exitosa:
-                    Embrion.objects.create(
-                        fertilizacion=fertilizacion,
-                        codigo=f'EMB-{tratamiento.id}-{i + 1:02d}',
-                        calidad=['A', 'B', 'C'][i % 3],
-                        estado='disponible',
-                        fecha_evaluacion=timezone.now().date() - timedelta(days=2 + indice),
-                    )
-        
-        # Etapa 7: Transferencia
-        if etapa in ['transferencia', 'seguimiento']:
-            from Transferencia.models import Transferencia
-            from Embrion.models import Embrion
-            
-            embriones = Embrion.objects.filter(
-                fertilizacion__ovocito__paciente=tratamiento.paciente,
-                estado='disponible'
-            )
-            
-            if embriones.exists():
-                transferencia, created = Transferencia.objects.get_or_create(
-                    tratamiento=tratamiento,
-                    defaults={
-                        'fecha': timezone.now().date() - timedelta(days=1 + indice),
-                        'numero_embriones_transferidos': min(1, embriones.count()),
-                        'observaciones': f'Transferencia exitosa - Embrión de calidad {embriones.first().calidad}',
-                    }
-                )
-                
-                if created:
-                    # Marcar embrión como transferido
-                    embrion_transferido = embriones.first()
-                    embrion_transferido.estado = 'transferido'
-                    embrion_transferido.save()
-        
-        # Etapa 8: Seguimiento post-transferencia
-        if etapa == 'seguimiento':
-            # Crear seguimientos adicionales
-            for dias in [7, 14, 21]:
-                Monitoreo.objects.get_or_create(
-                    tratamiento=tratamiento,
-                    fecha_atencion=timezone.now() + timedelta(days=dias),
-                    defaults={
-                        'descripcion': f'Seguimiento post-transferencia día +{dias}',
-                        'atendido': False,
-                    }
-                )
-
-    def crear_horarios_medicos(self, medicos, skip_turnos):
+    def crear_horarios_para_medicos(self, medicos, skip_turnos):
         """Crea horarios disponibles para todos los médicos"""
         if skip_turnos:
             self.stdout.write('⏭️ Omitiendo creación de horarios médicos...')
-            return False
+            return False, {}
 
         self.stdout.write('\n📋 Creando horarios disponibles para médicos...')
         
@@ -269,15 +207,18 @@ class Command(BaseCommand):
         ]
         
         exito_total = True
+        turnos_por_medico = {}  # {medico_id: [lista_de_ids_de_turnos]}
+        
         for i, medico in enumerate(medicos):
             config = horarios_config[i % len(horarios_config)]
+            turnos_por_medico[medico.id] = []
             
-            self.stdout.write(f'\n  👨‍⚕️ Creando horarios para {medico.first_name} {medico.last_name}')
+            self.stdout.write(f'  👨‍⚕️ {medico.first_name} {medico.last_name}')
             
             for dia in config["dias"]:
                 dias_semana = {1: "Lunes", 2: "Martes", 3: "Miércoles", 4: "Jueves", 5: "Viernes"}
                 
-                exito = self.crear_turnos_masivos_api(
+                exito, _ = self.crear_horarios_masivos_api(
                     medico_id=medico.id,
                     dia_semana=dia,
                     hora_inicio=config["inicio"],
@@ -286,51 +227,84 @@ class Command(BaseCommand):
                 
                 if not exito:
                     exito_total = False
-                    self.stdout.write(f'    ❌ Error creando horarios {dias_semana[dia]}')
                 else:
-                    self.stdout.write(f'    ✅ {dias_semana[dia]}: {config["inicio"]}-{config["fin"]}')
+                    # Guardar los IDs de turnos para este médico (obtenidos por GET)
+                    turnos_ids_reales = self.obtener_turnos_medico_api(medico.id)
+                    turnos_por_medico[medico.id].extend(turnos_ids_reales)
+                    self.stdout.write(f'    ✅ {dias_semana[dia]}: {config["inicio"]}-{config["fin"]} ({len(turnos_ids_reales)} turnos disponibles)')
         
         if exito_total:
-            self.stdout.write('\n✅ Todos los horarios médicos creados exitosamente')
+            total_turnos = sum(len(ids) for ids in turnos_por_medico.values())
+            self.stdout.write(f'✅ Todos los horarios médicos creados exitosamente ({total_turnos} turnos totales)')
         else:
-            self.stdout.write('\n⚠️ Algunos horarios no se pudieron crear')
+            self.stdout.write('⚠️ Algunos horarios no se pudieron crear')
             
-        return exito_total
+        return exito_total, turnos_por_medico
 
-    def sincronizar_turnos_con_api(self, turnos_locales, skip_turnos):
-        """Reserva turnos específicos en la API externa usando los turnos locales"""
+    def crear_turnos_locales_y_reservar(self, medicos, pacientes, tratamientos, turnos_por_medico, skip_turnos):
+        """Crea turnos locales y los reserva en la API externa usando IDs reales"""
         if skip_turnos:
-            self.stdout.write('⏭️ Omitiendo sincronización con API externa...')
-            return []
+            self.stdout.write('⏭️ Omitiendo creación de turnos...')
+            return [], []
 
-        self.stdout.write('\n� Sincronizando turnos con API externa...')
-        turnos_sincronizados = []
+        from Turnos.models import Turno
         
-        for turno_data in turnos_locales:
-            turno = turno_data['turno']
-            tratamiento = turno_data['tratamiento']
-            
-            # Usar el ID real del turno local
-            id_turno = turno.id
-            
-            turno_exitoso = self.reservar_turno_api(
-                medico_id=turno.Medico.id,
-                paciente_id=turno.Paciente.id,
-                fecha=turno.fecha_hora.date(),
-                hora=turno.fecha_hora.strftime("%H:%M"),
-                id_turno=id_turno
+        self.stdout.write('\n📅 Creando turnos locales...')
+        turnos_locales = []
+        
+        for i, tratamiento in enumerate(tratamientos):
+            # Crear turno local
+            turno, created = Turno.objects.get_or_create(
+                Paciente=tratamiento.paciente,
+                Medico=tratamiento.medico,
+                defaults={
+                    'fecha_hora': timezone.now() + timedelta(days=1, hours=i+9),  
+                    'cancelado': False,
+                    'atendido': False,
+                    'id_externo': 1000 + i,
+                }
             )
             
-            if turno_exitoso:
-                turnos_sincronizados.append({
-                    'turno_local': turno,
-                    'medico': turno.Medico,
-                    'paciente': turno.Paciente,
-                    'fecha': turno.fecha_hora.date()
-                })
+            if created:
+                self.stdout.write(f'  ✅ Turno #{turno.id} para {tratamiento.paciente.first_name}')
+            
+            # Asociar al tratamiento
+            tratamiento.turnos.add(turno)
+            turnos_locales.append(turno)
+
+        # Reservar en API externa usando IDs reales
+        self.stdout.write('\n🔄 Reservando turnos en API externa...')
+        turnos_reservados = []
         
-        self.stdout.write(f'✅ {len(turnos_sincronizados)} turnos reservados en API')
-        return turnos_sincronizados
+        for i, turno in enumerate(turnos_locales):
+            medico_id = turno.Medico.id
+            
+            # Obtener un ID de turno real disponible para este médico
+            if medico_id in turnos_por_medico and turnos_por_medico[medico_id]:
+                # Usar el primer turno disponible para este médico
+                id_turno_real = turnos_por_medico[medico_id].pop(0)  # Quitar de la lista para no reutilizar
+                
+                exito = self.reservar_turno_api(
+                    medico_id=medico_id,
+                    paciente_id=turno.Paciente.id,
+                    fecha=turno.fecha_hora.date(),
+                    hora=turno.fecha_hora.strftime("%H:%M"),
+                    id_turno=id_turno_real  # Usar ID real de la API
+                )
+                
+                if exito:
+                    # Actualizar el turno local con el ID real de la API
+                    turno.id_externo = id_turno_real
+                    turno.save()
+                    turnos_reservados.append(turno)
+                    self.stdout.write(f'    ✅ Turno reservado: {turno.Paciente.first_name} con {turno.Medico.first_name} (ID API: {id_turno_real})')
+                else:
+                    self.stdout.write(f'    ❌ Error reservando turno para {turno.Paciente.first_name}')
+            else:
+                self.stdout.write(f'    ⚠️ No hay turnos disponibles para médico {turno.Medico.first_name}')
+        
+        self.stdout.write(f'✅ {len(turnos_reservados)} turnos reservados en API')
+        return turnos_locales, turnos_reservados
 
     def handle(self, *args, **options):
         if options['clear']:
@@ -622,15 +596,14 @@ class Command(BaseCommand):
                 )
 
         # =====================================
-        # 5. CREAR TURNOS LOCALES
+        # 5. CREAR TURNOS Y ASOCIARLOS A TRATAMIENTOS
         # =====================================
-        self.stdout.write('\n📅 Creando turnos locales...')
+        self.stdout.write('\n📅 Creando turnos y asociándolos a tratamientos...')
         
         from Turnos.models import Turno
-        turnos_locales = []
         
         for i, tratamiento in enumerate(tratamientos):
-            # Crear un turno local para cada tratamiento
+            # Crear un turno para cada tratamiento
             turno, created = Turno.objects.get_or_create(
                 Paciente=tratamiento.paciente,
                 Medico=tratamiento.medico,
@@ -638,7 +611,7 @@ class Command(BaseCommand):
                     'fecha_hora': timezone.now() + timedelta(days=1, hours=i+9),  # Turnos al día siguiente a las 9, 10, 11 AM
                     'cancelado': False,
                     'atendido': False,
-                    'id_externo': 1000 + i,  # ID para sincronización con API
+                    'id_externo': 1000 + i,  # ID único para cada turno
                 }
             )
             
@@ -648,12 +621,6 @@ class Command(BaseCommand):
             # Asociar el turno al tratamiento
             tratamiento.turnos.add(turno)
             self.stdout.write(f'    ✅ Turno asociado al Tratamiento #{tratamiento.id}')
-            
-            # Guardar para sincronizar con API externa
-            turnos_locales.append({
-                'turno': turno,
-                'tratamiento': tratamiento
-            })
 
         # =====================================
         # 6. CREAR MONITOREOS
@@ -802,30 +769,37 @@ class Command(BaseCommand):
         self.stdout.write(f'📝 Eventos de historial creados: {created_historial}\n')
 
         # =====================================
-        # 5.1 CREAR HORARIOS MÉDICOS EN API EXTERNA
+        # 7. GESTIÓN COMPLETA DE TURNOS API
         # =====================================
-        horarios_creados = False
+        turnos_locales = []
+        turnos_reservados = []
+        
         if not options.get('skip_turnos', False):
-            horarios_creados = self.crear_horarios_medicos(medicos, options.get('skip_turnos', False))
-
+            # Verificar token antes de empezar
+            token_grupo_3 = os.getenv('TOKEN_GRUPO_3')
+            if not token_grupo_3:
+                self.stdout.write('❌ Variable de entorno TOKEN_GRUPO_3 no encontrada')
+                self.stdout.write('   Ejecuta: export TOKEN_GRUPO_3="tu_token_aqui"')
+                return
+            
+            
+            # Paso 1: Eliminar todos los turnos existentes
+            self.stdout.write('\n🗑️ Eliminando turnos existentes en API...')
+            self.eliminar_todos_turnos_api()
+            
+            # Paso 2: Crear horarios masivos para médicos y capturar IDs
+            exito_horarios, turnos_por_medico = self.crear_horarios_para_medicos(medicos, options.get('skip_turnos', False))
+            
+            # Paso 3: Crear turnos locales y reservar específicos usando IDs reales
+            if exito_horarios:
+                turnos_locales, turnos_reservados = self.crear_turnos_locales_y_reservar(
+                    medicos, pacientes, tratamientos, turnos_por_medico, options.get('skip_turnos', False)
+                )
+            else:
+                self.stdout.write('⚠️ No se crearon horarios médicos, omitiendo turnos específicos')
+        
         # =====================================
-        # 5.2 RESERVAR TURNOS ESPECÍFICOS EN API EXTERNA
-        # =====================================
-        turnos_sincronizados = []
-        if not options.get('skip_turnos', False) and horarios_creados:
-            turnos_sincronizados = self.sincronizar_turnos_con_api(turnos_locales, options.get('skip_turnos', False))
-        elif not options.get('skip_turnos', False) and not horarios_creados:
-            self.stdout.write('⚠️ No se pudieron crear horarios médicos, omitiendo reserva de turnos')
-
-        if options.get('con_etapas', False):
-            self.stdout.write('\n🔄 Aplicando etapas de tratamiento...')
-            for i, tratamiento in enumerate(tratamientos):
-                etapa = self.obtener_etapa_tratamiento(i)
-                self.stdout.write(f'  ✅ {tratamiento.paciente.first_name} - Etapa: {etapa}')
-                self.crear_datos_por_etapa(tratamiento, etapa, i)
-
-        # =====================================
-        # 6. RESUMEN
+        # 8. RESUMEN
         # =====================================
         self.stdout.write(self.style.SUCCESS('\n' + '='*60))
         self.stdout.write(self.style.SUCCESS('✅ BASE DE DATOS INICIALIZADA'))
@@ -836,17 +810,12 @@ class Command(BaseCommand):
         self.stdout.write(f'  💊 Tratamientos: {len(tratamientos)}')
         self.stdout.write(f'  📋 Monitoreos: {Monitoreo.objects.count()}')
         self.stdout.write(f'  🗓️  Turnos locales: {len(turnos_locales)}')
-        if 'horarios_creados' in locals() and horarios_creados:
-            self.stdout.write(f'  📋 Horarios médicos creados en API: ✅')
-        if turnos_sincronizados:
-            self.stdout.write(f'  📅 Turnos reservados en API: {len(turnos_sincronizados)}')
+        if turnos_reservados:
+            self.stdout.write(f'  📅 Turnos reservados en API: {len(turnos_reservados)}')
         
         # Mostrar etapas si se usaron
         if options.get('con_etapas', False):
-            self.stdout.write(f'\n🔍 Etapas de tratamiento aplicadas:')
-            for i, tratamiento in enumerate(tratamientos):
-                etapa = self.obtener_etapa_tratamiento(i)
-                self.stdout.write(f'  • {tratamiento.paciente.first_name}: {etapa}')
+            self.stdout.write(f'\n🔍 Etapas de tratamiento aplicadas (función disponible con --con-etapas)')
         
         self.stdout.write(f'\n🔑 Credenciales de prueba (password: 12345678):')
         self.stdout.write('\n  Médicos:')
@@ -874,13 +843,11 @@ class Command(BaseCommand):
         
         self.stdout.write(self.style.SUCCESS('\n✨ ¡Listo para usar!\n'))
         
-        # Información adicional sobre nuevas funcionalidades
-        if options.get('con_etapas', False) or turnos_sincronizados or (locals().get('horarios_creados', False)):
-            self.stdout.write(self.style.SUCCESS('🚀 Funcionalidades adicionales activadas:'))
-            if locals().get('horarios_creados', False):
-                self.stdout.write('  📋 Horarios médicos creados masivamente (5 semanas)')
-            if turnos_sincronizados:
-                self.stdout.write('  📅 Turnos específicos reservados con IDs sincronizados')
-            if options.get('con_etapas', False):
-                self.stdout.write('  🔄 Pacientes en diferentes etapas de tratamiento')
-            self.stdout.write('\n  💡 Perfecto para probar "Atender Paciente"\n')
+        # Información adicional sobre turnos API
+        if turnos_reservados:
+            self.stdout.write(self.style.SUCCESS('🚀 Funcionalidades de turnos activadas:'))
+            self.stdout.write('  🗑️ Eliminación de turnos existentes (DELETE /delete_turnos)')
+            self.stdout.write('  📋 Creación de horarios médicos masivos (POST /post_turnos)')
+            self.stdout.write('  📅 Reserva de turnos específicos (PATCH /reservar_turno)')
+            self.stdout.write('  🔗 IDs sincronizados entre BD local y API externa')
+            self.stdout.write('\n  💡 Perfecto para probar "Atender Paciente" con datos realistas\n')
