@@ -61,6 +61,20 @@ class Ovocito(models.Model):
 	]
 
 	tipo_estado = models.CharField(max_length=20, choices=TIPO_ESTADO_CHOICES, default=ESTADO_FRESCO)
+ 
+	rack_id = models.IntegerField(
+		"ID del rack donde se almacena el ovocito",
+		null=True,
+		blank=True,
+		help_text="Número identificador del rack de almacenamiento",
+	)
+ 
+	tanque_id = models.IntegerField(
+		"ID del tanque donde se almacena el ovocito",
+		null=True,
+		blank=True,
+		help_text="Número identificador del tanque de almacenamiento",
+	)
 
 
 	def __str__(self) -> str:
