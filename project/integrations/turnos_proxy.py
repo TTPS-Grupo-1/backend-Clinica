@@ -50,7 +50,7 @@ def turnos_proxy_get(request):
     if request.method != 'GET':
         return JsonResponse({"success": False, "error": "Método no permitido. Use GET."}, status=405)
 
-    id_medico = request.GET.get('id_medico', '1')
+    id_medico = request.GET.get('id_medico')
     token = request.headers.get('Authorization', AUTH_TOKEN)
 
     url = f"{API_BASE_URL}/get_turnos_medico?id_medico={id_medico}"
