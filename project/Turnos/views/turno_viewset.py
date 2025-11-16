@@ -1,6 +1,7 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from Turnos.models import Turno
+from rest_framework.response import Response
 from Turnos.serializers import TurnoSerializer
 from Turnos.views.create_turno_view import CreateTurnoMixin
 import requests
@@ -27,3 +28,40 @@ class TurnoViewSet(CreateTurnoMixin, viewsets.ModelViewSet):
             print(f"❌ Error al consultar turnos: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
             return JsonResponse({"error": str(e)}, status=500)
+    @action(detail=False, methods=['get'], url_path='por-id-externo/(?P<id_externo>[^/.]+)')
+    def por_id_externo(self, request, id_externo=None):
+        """
+        Endpoint para obtener un turno por su id_externo.
+        GET /api/turnos/por-id-externo/<id_externo>/
+        """
+        print(f"🔍 Buscando turno con id_externo: {id_externo}")  # ✅ Log
+        print(f"🔍 Tipo de id_externo: {type(id_externo)}")  # ✅ Log
+        
+        try:
+            # Convertir a int si es necesario
+            id_externo_int = int(id_externo)
+            print(f"🔍 id_externo convertido a int: {id_externo_int}")  # ✅ Log
+            
+            turno = Turno.objects.get(id_externo=id_externo_int)
+            print(f"✅ Turno encontrado: {turno}")  # ✅ Log
+            
+            serializer = self.get_serializer(turno)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Turno.DoesNotExist:
+            print(f"❌ No se encontró turno con id_externo {id_externo}")  # ✅ Log
+            return Response(
+                {"detail": f"No se encontró un turno con id_externo {id_externo}."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except ValueError as e:
+            print(f"❌ Error de conversión: {e}")  # ✅ Log
+            return requests.Response(
+                {"detail": f"id_externo inválido: {id_externo}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            print(f"❌ Error inesperado: {str(e)}")  # ✅ Log
+            return Response(
+                {"detail": f"Error al buscar turno: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

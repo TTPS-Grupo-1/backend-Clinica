@@ -210,7 +210,7 @@ class TratamientoViewSet(viewsets.ModelViewSet):
                 {"detail": f"No se encontró tratamiento activo para el paciente {paciente_id}."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-
+        print(f"🧩 Tratamientos encontrados: {tratamientos.count()}")
         tratamiento = tratamientos.first()
         serializer = self.get_serializer(tratamiento)
         return Response(serializer.data, status=status.HTTP_200_OK)
