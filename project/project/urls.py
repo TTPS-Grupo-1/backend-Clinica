@@ -45,6 +45,7 @@ urlpatterns = [
     path('api/turnos/grilla/', turnos_proxy_post, name='turnos_post_proxy'),
     path('api/reservar_turno/', turnos_proxy_reservar, name='turnos_proxy_reservar'),
     path('api/donacion/', gametos_donacion_proxy),
+    path('api/local/turnos/', include('Turnos.urls')),
     path('api/tanques/registrar/', almacenamiento_reserva_proxy),
     path('api/turnos/mis_turnos/', turnos_proxy_get_turnos_paciente, name='turnos_proxy_get_turnos_paciente'),
     path('api/turnos/cancelar_turno/', turnos_proxy_cancelar, name='turnos_proxy_cancelar'),

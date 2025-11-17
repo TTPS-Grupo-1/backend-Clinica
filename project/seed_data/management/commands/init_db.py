@@ -248,62 +248,45 @@ class Command(BaseCommand):
             return [], []
 
         from Turnos.models import Turno
-        
-        self.stdout.write('\n📅 Creando turnos locales...')
+        self.stdout.write('\n� Reservando y creando turnos locales usando IDs reales de la API...')
         turnos_locales = []
-        
-        for i, tratamiento in enumerate(tratamientos):
-            # Crear turno local
-            turno, created = Turno.objects.get_or_create(
-                Paciente=tratamiento.paciente,
-                Medico=tratamiento.medico,
-                defaults={
-                    'fecha_hora': timezone.now() + timedelta(days=1, hours=i+9),  
-                    'cancelado': False,
-                    'atendido': False,
-                    'id_externo': 1000 + i,
-                }
-            )
-            
-            if created:
-                self.stdout.write(f'  ✅ Turno #{turno.id} para {tratamiento.paciente.first_name}')
-            
-            # Asociar al tratamiento
-            tratamiento.turnos.add(turno)
-            turnos_locales.append(turno)
-
-        # Reservar en API externa usando IDs reales
-        self.stdout.write('\n🔄 Reservando turnos en API externa...')
         turnos_reservados = []
-        
-        for i, turno in enumerate(turnos_locales):
-            medico_id = turno.Medico.id
-            
-            # Obtener un ID de turno real disponible para este médico
+
+        for i, tratamiento in enumerate(tratamientos):
+            medico_id = tratamiento.medico.id
+            fecha_turno = timezone.now() + timedelta(days=1, hours=i+9)
+
             if medico_id in turnos_por_medico and turnos_por_medico[medico_id]:
-                # Usar el primer turno disponible para este médico
-                id_turno_real = turnos_por_medico[medico_id].pop(0)  # Quitar de la lista para no reutilizar
-                
+                id_turno_real = turnos_por_medico[medico_id].pop(0)
+
                 exito = self.reservar_turno_api(
                     medico_id=medico_id,
-                    paciente_id=turno.Paciente.id,
-                    fecha=turno.fecha_hora.date(),
-                    hora=turno.fecha_hora.strftime("%H:%M"),
-                    id_turno=id_turno_real  # Usar ID real de la API
+                    paciente_id=tratamiento.paciente.id,
+                    fecha=fecha_turno.date(),
+                    hora=fecha_turno.strftime("%H:%M"),
+                    id_turno=id_turno_real
                 )
-                
+
                 if exito:
-                    # Actualizar el turno local con el ID real de la API
-                    turno.id_externo = id_turno_real
-                    turno.save()
+                    # Crear el turno local ya con el id_externo real
+                    turno = Turno.objects.create(
+                        Paciente=tratamiento.paciente,
+                        Medico=tratamiento.medico,
+                        fecha_hora=fecha_turno,
+                        cancelado=False,
+                        atendido=False,
+                        id_externo=id_turno_real,
+                    )
+                    tratamiento.turnos.add(turno)
+                    turnos_locales.append(turno)
                     turnos_reservados.append(turno)
-                    self.stdout.write(f'    ✅ Turno reservado: {turno.Paciente.first_name} con {turno.Medico.first_name} (ID API: {id_turno_real})')
+                    self.stdout.write(f'    ✅ Turno creado y reservado: {turno.Paciente.first_name} con {turno.Medico.first_name} (ID API: {id_turno_real})')
                 else:
-                    self.stdout.write(f'    ❌ Error reservando turno para {turno.Paciente.first_name}')
+                    self.stdout.write(f'    ❌ Error reservando turno para {tratamiento.paciente.first_name} (ID intento: {id_turno_real})')
             else:
-                self.stdout.write(f'    ⚠️ No hay turnos disponibles para médico {turno.Medico.first_name}')
-        
-        self.stdout.write(f'✅ {len(turnos_reservados)} turnos reservados en API')
+                self.stdout.write(f'    ⚠️ No hay turnos disponibles para médico {tratamiento.medico.first_name} para asociar a {tratamiento.paciente.first_name}')
+
+        self.stdout.write(f'✅ {len(turnos_reservados)} turnos creados y reservados en API')
         return turnos_locales, turnos_reservados
 
     def handle(self, *args, **options):
@@ -597,30 +580,11 @@ class Command(BaseCommand):
 
         # =====================================
         # 5. CREAR TURNOS Y ASOCIARLOS A TRATAMIENTOS
+        #    Nota: la creación de los turnos locales se realizará en el paso de
+        #    reserva (crear_turnos_locales_y_reservar) para asegurarnos de que
+        #    el campo `id_externo` se sincronice con los IDs reales de la API.
         # =====================================
-        self.stdout.write('\n📅 Creando turnos y asociándolos a tratamientos...')
-        
-        from Turnos.models import Turno
-        
-        for i, tratamiento in enumerate(tratamientos):
-            # Crear un turno para cada tratamiento
-            turno, created = Turno.objects.get_or_create(
-                Paciente=tratamiento.paciente,
-                Medico=tratamiento.medico,
-                defaults={
-                    'fecha_hora': timezone.now() + timedelta(days=1, hours=i+9),  # Turnos al día siguiente a las 9, 10, 11 AM
-                    'cancelado': False,
-                    'atendido': False,
-                    'id_externo': 1000 + i,  # ID único para cada turno
-                }
-            )
-            
-            if created:
-                self.stdout.write(f'  ✅ Turno #{turno.id} creado para {tratamiento.paciente.first_name}')
-            
-            # Asociar el turno al tratamiento
-            tratamiento.turnos.add(turno)
-            self.stdout.write(f'    ✅ Turno asociado al Tratamiento #{tratamiento.id}')
+        self.stdout.write('\n📅 Preparando asociación de turnos a tratamientos (se crearán al reservar)...')
 
         # =====================================
         # 6. CREAR MONITOREOS

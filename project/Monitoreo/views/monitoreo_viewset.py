@@ -257,3 +257,45 @@ class MonitoreoViewSet(viewsets.ModelViewSet):
                 {'error': str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+    
+    @action(detail=False, methods=['get'], url_path='mas-proximo')
+    def mas_proximo(self, request):
+        """
+        Obtiene el monitoreo no atendido más cercano a la fecha actual
+        para un tratamiento específico.
+        GET /api/monitoreo/monitoreos/mas-proximo/?tratamiento=1
+        """
+        tratamiento_id = request.query_params.get('tratamiento', None)
+        
+        if not tratamiento_id:
+            return Response({
+                "success": False,
+                "message": "El parámetro 'tratamiento' es requerido"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Buscar monitoreos no atendidos del tratamiento
+        monitoreos = Monitoreo.objects.filter(
+            tratamiento_id=tratamiento_id,
+            atendido=False,
+            fecha_atencion__isnull=False
+        )
+        
+        if not monitoreos.exists():
+            return Response({
+                "success": False,
+                "message": "No hay monitoreos pendientes para este tratamiento"
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Encontrar el más cercano a la fecha actual
+        ahora = timezone.now()
+        monitoreo_mas_proximo = min(
+            monitoreos,
+            key=lambda m: abs((m.fecha_atencion - ahora).total_seconds())
+        )
+        
+        serializer = self.get_serializer(monitoreo_mas_proximo)
+        
+        return Response({
+            "success": True,
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
