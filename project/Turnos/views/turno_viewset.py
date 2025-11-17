@@ -99,3 +99,16 @@ class TurnoViewSet(CreateTurnoMixin, viewsets.ModelViewSet):
         except Exception as e:
             print(f"❌ Error al filtrar turnos locales por externos: {e}")
             return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['patch'], url_path='marcar-atendido')
+    def marcar_atendido(self, request, pk=None):
+        """Marca un turno local como atendido: POST /api/local/turnos/{pk}/marcar-atendido/"""
+        try:
+            turno = self.get_object()
+            turno.atendido = True
+            turno.save()
+            serializer = self.get_serializer(turno)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"❌ Error marcando turno como atendido: {e}")
+            return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
