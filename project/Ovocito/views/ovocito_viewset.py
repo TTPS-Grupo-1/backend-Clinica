@@ -40,7 +40,7 @@ class OvocitoViewSet(
         Filtrar ovocitos por paciente usando query parameters.
         Ejemplo: /api/ovocitos/?paciente=4
         """
-        queryset = Ovocito.objects.all()
+        queryset = Ovocito.objects.filter(usado=False)
         paciente_id = self.request.query_params.get('paciente')
         
         if paciente_id:

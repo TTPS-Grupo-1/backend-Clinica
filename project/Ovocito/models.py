@@ -75,6 +75,12 @@ class Ovocito(models.Model):
 		blank=True,
 		help_text="Número identificador del tanque de almacenamiento",
 	)
+ 
+	usado = models.BooleanField(
+		default=False,
+		help_text="Indica si el ovocito ha sido usado",
+
+	)
 
 
 	def __str__(self) -> str:
