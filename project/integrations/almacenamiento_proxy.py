@@ -18,7 +18,7 @@ def almacenamiento_proxy(request):
 
         base_url = "https://omtalaimckjolwtkgqjw.supabase.co/functions/v1/almacenamiento"
         params = {
-            'group_number': group_number,
+            'group_number': 1,
             'page': page,
             'page_size': page_size,
         }

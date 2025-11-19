@@ -556,26 +556,31 @@ class Command(BaseCommand):
         # =====================================
         self.stdout.write('\n🔬 Creando segundas consultas...')
         
-        # Datos para segundas consultas con diferentes escenarios de semen viable
-        semen_viable_scenarios = [True, False, True]  # Diferentes casos para probar
-        
+        # Datos para segundas consultas con diferentes escenarios de semen/ovocito
+        # Último caso: ni el semen ni el ovocito son viables
+        segunda_consulta_scenarios = [
+            {'semen_viable': True, 'ovocito_viable': True},
+            {'semen_viable': False, 'ovocito_viable': True},
+            {'semen_viable': False, 'ovocito_viable': False},  # último caso: ninguno viable
+        ]
+
         for i, tratamiento in enumerate(tratamientos):
             if not tratamiento.segunda_consulta:  # Solo crear si no existe
-                semen_viable = semen_viable_scenarios[i % len(semen_viable_scenarios)]
-                
-                # Crear la segunda consulta
+                scenario = segunda_consulta_scenarios[i % len(segunda_consulta_scenarios)]
+
+                # Crear la segunda consulta con el escenario seleccionado
                 segunda_consulta = SegundaConsulta.objects.create(
-                    semen_viable=semen_viable,
-                    ovocito_viable=True,  # Asumir que es viable por defecto
+                    semen_viable=scenario['semen_viable'],
+                    ovocito_viable=scenario['ovocito_viable'],
                 )
-                
+
                 # Asignar la segunda consulta al tratamiento
                 tratamiento.segunda_consulta = segunda_consulta
                 tratamiento.save()
-                
+
                 self.stdout.write(
                     f'  ✅ Segunda consulta creada para {tratamiento.paciente.first_name} - '
-                    f'Semen viable: {semen_viable}'
+                    f'Semen viable: {scenario["semen_viable"]} - Ovocito viable: {scenario["ovocito_viable"]}'
                 )
 
         # =====================================
