@@ -40,7 +40,7 @@ class OvocitoViewSet(
         Filtrar ovocitos por paciente usando query parameters.
         Ejemplo: /api/ovocitos/?paciente=4
         """
-        queryset = Ovocito.objects.filter(usado=False)
+        queryset = Ovocito.objects.all()
         paciente_id = self.request.query_params.get('paciente')
         
         if paciente_id:
@@ -83,4 +83,43 @@ class OvocitoViewSet(
             return Response({
                 'success': False,
                 'message': f'Error obteniendo ovocitos: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+    @action(
+    detail=False,
+    methods=['get'],
+    url_path=r'no-usados/(?P<paciente_id>\d+)'
+)
+    def ovocitos_no_usados_por_paciente(self, request, paciente_id=None):
+        """
+        Devuelve todos los ovocitos de un paciente donde usado=False.
+        Ruta: /api/ovocitos/no-usados/<paciente_id>/
+        """
+        try:
+            paciente_id = int(paciente_id)
+
+            ovocitos = Ovocito.objects.filter(
+                paciente_id=paciente_id,
+                usado=False
+            ).order_by('-id_ovocito')
+
+            serializer = self.get_serializer(ovocitos, many=True)
+
+            return Response({
+                'success': True,
+                'count': ovocitos.count(),
+                'ovocitos': serializer.data
+            }, status=status.HTTP_200_OK)
+
+        except ValueError:
+            return Response({
+                'success': False,
+                'message': "ID de paciente inválido"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            logger.error(f"Error obteniendo ovocitos no usados del paciente {paciente_id}: {str(e)}")
+            return Response({
+                'success': False,
+                'message': f"Error obteniendo ovocitos no usados: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
