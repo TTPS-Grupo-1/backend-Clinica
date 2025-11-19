@@ -820,3 +820,372 @@ class Command(BaseCommand):
             self.stdout.write('  📅 Reserva de turnos específicos (PATCH /reservar_turno)')
             self.stdout.write('  🔗 IDs sincronizados entre BD local y API externa')
             self.stdout.write('\n  💡 Perfecto para probar "Atender Paciente" con datos realistas\n')
+        
+        # 1. Crear paciente y médico extra
+        paciente_extra, _ = CustomUser.objects.get_or_create(
+            email='extra.paciente@email.com',
+            defaults={
+                'first_name': 'Extra',
+                'last_name': 'Paciente',
+                'dni': 43456789,
+                'telefono': '2215678999',
+                'rol': 'PACIENTE',
+                'is_active': True,
+            }
+        )
+        paciente_extra.set_password('12345678')
+        paciente_extra.save()
+
+        medico_extra, _ = CustomUser.objects.get_or_create(
+            email='extra.medico@clinica.com',
+            defaults={
+                'first_name': 'Extra',
+                'last_name': 'Medico',
+                'dni': 34123456,
+                'telefono': '2214567999',
+                'rol': 'MEDICO',
+                'is_active': True,
+            }
+        )
+        medico_extra.set_password('12345678')
+        medico_extra.save()
+
+        # 2. Crear horarios en la API para el médico extra
+        exito, _ = self.crear_horarios_masivos_api(
+            medico_id=medico_extra.id,
+            dia_semana=1,  # Lunes
+            hora_inicio="09:00",
+            hora_fin="12:00"
+        )
+
+        # 3. Obtener un turno disponible en la API para ese médico
+        turnos_ids = self.obtener_turnos_medico_api(medico_extra.id)
+        if turnos_ids:
+            id_turno_api = turnos_ids[0]
+            fecha_turno = timezone.now() + timedelta(days=1)
+            hora_turno = "09:00"
+
+            # 4. Reservar el turno en la API para el paciente extra
+            reservado = self.reservar_turno_api(
+                medico_id=medico_extra.id,
+                paciente_id=paciente_extra.id,
+                fecha=fecha_turno.date(),
+                hora=hora_turno,
+                id_turno=id_turno_api
+            )
+
+            if reservado:
+                # 5. Crear el turno local con el id_externo de la API
+                from Turnos.models import Turno
+                turno_local = Turno.objects.create(
+                    Paciente=paciente_extra,
+                    Medico=medico_extra,
+                    fecha_hora=fecha_turno,
+                    cancelado=False,
+                    atendido=False,
+                    id_externo=id_turno_api,
+                )
+                self.stdout.write(f'✅ Turno extra creado y reservado en API y local: {turno_local.Paciente.first_name} con {turno_local.Medico.first_name} (ID externo: {turno_local.id_externo})')
+            else:
+                self.stdout.write('❌ No se pudo reservar el turno en la API')
+        else:
+            self.stdout.write('❌ No hay turnos disponibles en la API para el médico extra')
+
+        # 6.1 VERIFICAR QUE EL TURNO EXTRA ESTÁ RESERVADO Y TIENE PACIENTE ASIGNADO EN LA API
+        self.stdout.write('\n🔍 Verificando turno extra en la API...')
+        try:
+            url = f"https://ahlnfxipnieoihruewaj.supabase.co/functions/v1/get_turnos_medico?id_medico={medico_extra.id}&id_grupo=1"
+            token_grupo_3 = os.getenv('TOKEN_GRUPO_3')
+            headers = {
+                "Authorization": f"Bearer {token_grupo_3}",
+                "Content-Type": "application/json",
+            }
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code in [200, 201]:
+                turnos_data = response.json()
+                # Buscar el turno por id_turno_api
+                turno_api = None
+                if isinstance(turnos_data, dict) and 'data' in turnos_data:
+                    turnos_list = turnos_data['data']
+                elif isinstance(turnos_data, list):
+                    turnos_list = turnos_data
+                else:
+                    turnos_list = []
+                for t in turnos_list:
+                    if t.get('id') == id_turno_api:
+                        turno_api = t
+                        break
+                if turno_api:
+                    self.stdout.write(f"  🟢 Turno API encontrado: id={turno_api.get('id')}, id_paciente={turno_api.get('id_paciente')}")
+                    if turno_api.get('id_paciente') == paciente_extra.id:
+                        self.stdout.write("  ✅ El turno extra está reservado correctamente para el paciente extra en la API.")
+                    else:
+                        self.stdout.write("  ⚠️ El turno extra NO tiene el paciente asignado en la API.")
+                else:
+                    self.stdout.write("  ❌ No se encontró el turno extra en la API.")
+            else:
+                self.stdout.write(f"  ❌ Error consultando la API: {response.status_code}")
+        except Exception as e:
+            self.stdout.write(f"  ❌ Error verificando turno extra en la API: {str(e)}")
+
+        # =====================================
+        # AGREGAR 3 PACIENTES EXTRA CON DIFERENTES ESTADOS DE TRATAMIENTO
+        # =====================================
+        self.stdout.write('\n➕ Agregando 3 pacientes extra con diferentes estados...')
+
+        # ----------------
+        # PACIENTE 1: Primera consulta completada (próximo: Segunda consulta)
+        # ----------------
+        paciente_pc, _ = CustomUser.objects.get_or_create(
+            email='paciente.pc@email.com',
+            defaults={
+                'first_name': 'Pedro',
+                'last_name': 'Primera',
+                'dni': 44567890,
+                'telefono': '2215679001',
+                'rol': 'PACIENTE',
+                'is_active': True,
+            }
+        )
+        paciente_pc.set_password('12345678')
+        paciente_pc.save()
+        self.stdout.write(f'  ✅ Paciente 1: {paciente_pc.first_name} {paciente_pc.last_name} (Primera consulta completada)')
+
+        # Crear Primera Consulta
+        primera_consulta_pc = PrimeraConsulta.objects.create(
+            objetivo_consulta='Evaluación inicial para tratamiento de fertilidad',
+            antecedentes_clinicos_1={'diabetes': False, 'hipertension': False},
+            antecedentes_clinicos_2={'alergias': 'Ninguna', 'medicamentos': 'Ninguno'},
+            antecedentes_familiares_1='Sin antecedentes relevantes',
+            antecedentes_familiares_2='Sin antecedentes oncológicos',
+            antecedentes_genitales='Sin patología genital previa',
+            antecedentes_quirurgicos_1='Sin cirugías previas',
+            antecedentes_quirurgicos_2='Sin complicaciones',
+            examen_fisico_1='Paciente en buen estado general',
+            examen_fisico_2='Signos vitales normales'
+        )
+
+        # Crear Tratamiento con Primera Consulta completada
+        tratamiento_pc = Tratamiento.objects.create(
+            paciente=paciente_pc,
+            medico=medico_extra,
+            objetivo='Embarazo gameto propio',
+            fecha_inicio=timezone.now().date() - timedelta(days=15),
+            activo=True,
+            primera_consulta=primera_consulta_pc,
+        )
+
+        # Crear turno para Segunda Consulta
+        turnos_ids_pc = self.obtener_turnos_medico_api(medico_extra.id)
+        if turnos_ids_pc:
+            id_turno_pc = turnos_ids_pc[0]
+            fecha_turno_pc = timezone.now() + timedelta(days=2, hours=10)
+            
+            reservado_pc = self.reservar_turno_api(
+                medico_id=medico_extra.id,
+                paciente_id=paciente_pc.id,
+                fecha=fecha_turno_pc.date(),
+                hora="10:00",
+                id_turno=id_turno_pc
+            )
+            
+            if reservado_pc:
+                from Turnos.models import Turno
+                turno_pc = Turno.objects.create(
+                    Paciente=paciente_pc,
+                    Medico=medico_extra,
+                    fecha_hora=fecha_turno_pc,
+                    cancelado=False,
+                    atendido=False,
+                    id_externo=id_turno_pc,
+                    es_monitoreo=False,
+                )
+                self.stdout.write(f'    ✅ Turno para Segunda Consulta creado (ID externo: {id_turno_pc})')
+
+        # ----------------
+        # PACIENTE 2: Primera y Segunda consulta completadas (próximo: Monitoreo)
+        # ----------------
+        paciente_sc, _ = CustomUser.objects.get_or_create(
+            email='paciente.sc@email.com',
+            defaults={
+                'first_name': 'Sara',
+                'last_name': 'Segunda',
+                'dni': 45678901,
+                'telefono': '2215679002',
+                'rol': 'PACIENTE',
+                'is_active': True,
+            }
+        )
+        paciente_sc.set_password('12345678')
+        paciente_sc.save()
+        self.stdout.write(f'  ✅ Paciente 2: {paciente_sc.first_name} {paciente_sc.last_name} (Primera y Segunda consulta completadas)')
+
+        # Crear Primera Consulta
+        primera_consulta_sc = PrimeraConsulta.objects.create(
+            objetivo_consulta='Evaluación inicial para tratamiento de fertilidad',
+            antecedentes_clinicos_1={'diabetes': False, 'hipertension': False},
+            antecedentes_clinicos_2={'alergias': 'Ninguna', 'medicamentos': 'Ácido fólico'},
+            antecedentes_familiares_1='Sin antecedentes relevantes',
+            antecedentes_familiares_2='Sin antecedentes oncológicos',
+            antecedentes_genitales='Sin patología genital previa',
+            antecedentes_quirurgicos_1='Sin cirugías previas',
+            antecedentes_quirurgicos_2='Sin complicaciones',
+            examen_fisico_1='Paciente en buen estado general',
+            examen_fisico_2='Signos vitales normales'
+        )
+
+        # Crear Segunda Consulta
+        segunda_consulta_sc = SegundaConsulta.objects.create(
+            semen_viable=True,
+            ovocito_viable=True,
+        )
+
+        # Crear Tratamiento con ambas consultas completadas
+        tratamiento_sc = Tratamiento.objects.create(
+            paciente=paciente_sc,
+            medico=medico_extra,
+            objetivo='Embarazo gameto propio',
+            fecha_inicio=timezone.now().date() - timedelta(days=30),
+            activo=True,
+            primera_consulta=primera_consulta_sc,
+            segunda_consulta=segunda_consulta_sc,
+        )
+
+        # Crear turno de monitoreo
+        turnos_ids_sc = self.obtener_turnos_medico_api(medico_extra.id)
+        if turnos_ids_sc:
+            id_turno_sc = turnos_ids_sc[0]
+            fecha_turno_sc = timezone.now() + timedelta(days=3, hours=11)
+            
+            reservado_sc = self.reservar_turno_api(
+                medico_id=medico_extra.id,
+                paciente_id=paciente_sc.id,
+                fecha=fecha_turno_sc.date(),
+                hora="11:00",
+                id_turno=id_turno_sc
+            )
+            
+            if reservado_sc:
+                from Turnos.models import Turno
+                turno_sc = Turno.objects.create(
+                    Paciente=paciente_sc,
+                    Medico=medico_extra,
+                    fecha_hora=fecha_turno_sc,
+                    cancelado=False,
+                    atendido=False,
+                    id_externo=id_turno_sc,
+                    es_monitoreo=True,  # ✅ Es un turno de monitoreo
+                )
+                self.stdout.write(f'    ✅ Turno de Monitoreo creado (ID externo: {id_turno_sc})')
+
+                # Crear monitoreo pendiente asociado
+                Monitoreo.objects.create(
+                    tratamiento=tratamiento_sc,
+                    fecha_atencion=fecha_turno_sc,
+                    descripcion='',
+                    atendido=False,
+                )
+                self.stdout.write(f'    ✅ Monitoreo pendiente creado')
+
+        # ----------------
+        # PACIENTE 3: Con 3 monitoreos (1 atendido, 1 pendiente próximo, 1 futuro)
+        # ----------------
+        paciente_mon, _ = CustomUser.objects.get_or_create(
+            email='paciente.mon@email.com',
+            defaults={
+                'first_name': 'Marta',
+                'last_name': 'Monitoreo',
+                'dni': 46789012,
+                'telefono': '2215679003',
+                'rol': 'PACIENTE',
+                'is_active': True,
+            }
+        )
+        paciente_mon.set_password('12345678')
+        paciente_mon.save()
+        self.stdout.write(f'  ✅ Paciente 3: {paciente_mon.first_name} {paciente_mon.last_name} (Con 3 monitoreos)')
+
+        # Crear Primera Consulta
+        primera_consulta_mon = PrimeraConsulta.objects.create(
+            objetivo_consulta='Evaluación inicial para tratamiento de fertilidad',
+            antecedentes_clinicos_1={'diabetes': False, 'hipertension': False},
+            antecedentes_clinicos_2={'alergias': 'Ninguna', 'medicamentos': 'Ácido fólico'},
+            antecedentes_familiares_1='Sin antecedentes relevantes',
+            antecedentes_familiares_2='Sin antecedentes oncológicos',
+            antecedentes_genitales='Sin patología genital previa',
+            antecedentes_quirurgicos_1='Sin cirugías previas',
+            antecedentes_quirurgicos_2='Sin complicaciones',
+            examen_fisico_1='Paciente en buen estado general',
+            examen_fisico_2='Signos vitales normales'
+        )
+
+        # Crear Segunda Consulta
+        segunda_consulta_mon = SegundaConsulta.objects.create(
+            semen_viable=True,
+            ovocito_viable=True,
+        )
+
+        # Crear Tratamiento
+        tratamiento_mon = Tratamiento.objects.create(
+            paciente=paciente_mon,
+            medico=medico_extra,
+            objetivo='Embarazo gameto propio',
+            fecha_inicio=timezone.now().date() - timedelta(days=45),
+            activo=True,
+            primera_consulta=primera_consulta_mon,
+            segunda_consulta=segunda_consulta_mon,
+        )
+
+        # Monitoreo 1: Atendido (pasado)
+        mon1 = Monitoreo.objects.create(
+            tratamiento=tratamiento_mon,
+            fecha_atencion=timezone.now() - timedelta(days=10),
+            descripcion='Primer monitoreo completado. Evolución favorable.',
+            atendido=True,
+            fecha_realizado=timezone.now() - timedelta(days=10),
+        )
+        self.stdout.write(f'    ✅ Monitoreo 1 (atendido hace 10 días)')
+
+        # Monitoreo 2: Pendiente próximo (turno reservado en API)
+        turnos_ids_mon = self.obtener_turnos_medico_api(medico_extra.id)
+        if turnos_ids_mon:
+            id_turno_mon = turnos_ids_mon[0]
+            fecha_turno_mon = timezone.now() + timedelta(days=1, hours=14)
+            
+            reservado_mon = self.reservar_turno_api(
+                medico_id=medico_extra.id,
+                paciente_id=paciente_mon.id,
+                fecha=fecha_turno_mon.date(),
+                hora="14:00",
+                id_turno=id_turno_mon
+            )
+            
+            if reservado_mon:
+                from Turnos.models import Turno
+                turno_mon = Turno.objects.create(
+                    Paciente=paciente_mon,
+                    Medico=medico_extra,
+                    fecha_hora=fecha_turno_mon,
+                    cancelado=False,
+                    atendido=False,
+                    id_externo=id_turno_mon,
+                    es_monitoreo=True,
+                )
+                self.stdout.write(f'    ✅ Turno para Monitoreo 2 creado (ID externo: {id_turno_mon})')
+
+        mon2 = Monitoreo.objects.create(
+            tratamiento=tratamiento_mon,
+            fecha_atencion=fecha_turno_mon if turnos_ids_mon else timezone.now() + timedelta(days=1),
+            descripcion='',
+            atendido=False,
+        )
+        self.stdout.write(f'    ✅ Monitoreo 2 (pendiente - mañana)')
+
+        # Monitoreo 3: Futuro (sin turno asignado aún)
+        mon3 = Monitoreo.objects.create(
+            tratamiento=tratamiento_mon,
+            fecha_atencion=timezone.now() + timedelta(days=7),
+            descripcion='',
+            atendido=False,
+        )
+        self.stdout.write(f'    ✅ Monitoreo 3 (futuro - en 7 días)')
