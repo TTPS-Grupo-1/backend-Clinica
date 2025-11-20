@@ -220,9 +220,9 @@ class CreateSegundaConsultaMixin:
                     url = "https://mvvuegssraetbyzeifov.supabase.co/functions/v1/send_email_v2"
 
                     payload = {
-                        "group": 8,  # 🔥 tu grupo real: 8
+                        "group": 1,  # 🔥 tu grupo real: 8
                         "toEmails": [paciente_email],
-                        "subject": "Orden médica de medicación",
+                        "subject": "Orden medica de medicacion",
                         "htmlBody": html_body,
                     }
 
