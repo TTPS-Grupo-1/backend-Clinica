@@ -6,6 +6,7 @@ from ..models import Fertilizacion
 from ..serializers import FertilizacionSerializer
 from Tratamiento.models import Tratamiento
 from Fenotipo.models import Fenotipo
+from django.db import transaction, IntegrityError
 import logging
 import requests
 
@@ -265,11 +266,51 @@ class FertilizacionViewSet(viewsets.ModelViewSet):
 				status=status.HTTP_500_INTERNAL_SERVER_ERROR
 			)
 
-	def create(self, request, *args, **kwargs):
-		serializer = self.get_serializer(data=request.data)
+	def create(self, request):
+		serializer = FertilizacionSerializer(data=request.data)
+		print("Creando fertilización desde ViewSet...")
+
+		# Validación inicial
 		if not serializer.is_valid():
 			logger.warning(f"Errores de validación Fertilización: {serializer.errors}")
-		serializer.is_valid(raise_exception=True)
-		self.perform_create(serializer)
-		headers = self.get_success_headers(serializer.data)
-		return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+			return Response({
+				"success": False,
+				"message": "Hay errores en los campos de la fertilización.",
+				"errors": serializer.errors
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+		try:
+			with transaction.atomic():
+
+				# === AQUÍ PEGO LA LÓGICA DEL MODELVIEWSET.CREATE() ===
+				fertilizacion = serializer.save()
+
+				# --- Tu lógica adicional ---
+				ovocito = fertilizacion.ovocito
+				ovocito.usado = True
+				ovocito.save(update_fields=["usado"])
+				logger.info(f"Ovocito {ovocito.id_ovocito} marcado como usado")
+
+				# Construir respuesta final
+				result = {
+					"success": True,
+					"message": "Fertilización registrada correctamente.",
+					"data": FertilizacionSerializer(fertilizacion).data,
+					"embryo": None
+				}
+
+				return Response(result, status=status.HTTP_201_CREATED)
+
+		except IntegrityError as e:
+			logger.error(f"Error de integridad al crear fertilización: {str(e)}")
+			return Response({
+				"success": False,
+				"message": "Error de integridad al registrar la fertilización."
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+		except Exception as e:
+			logger.exception("Error inesperado al crear fertilización.")
+			return Response({
+				"success": False,
+				"message": "Ocurrió un error al registrar la fertilización."
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
