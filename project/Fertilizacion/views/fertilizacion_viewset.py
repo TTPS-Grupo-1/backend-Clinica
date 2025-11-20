@@ -281,11 +281,13 @@ class FertilizacionViewSet(viewsets.ModelViewSet):
 
 		try:
 			with transaction.atomic():
-
-				# === AQUÍ PEGO LA LÓGICA DEL MODELVIEWSET.CREATE() ===
+				# Guardar la fertilización
 				fertilizacion = serializer.save()
-
-				# --- Tu lógica adicional ---
+				
+				# ✅ Asegurar que el id existe
+				fertilizacion.refresh_from_db()
+				
+				# Marcar ovocito como usado
 				ovocito = fertilizacion.ovocito
 				ovocito.usado = True
 				ovocito.save(update_fields=["usado"])
@@ -295,9 +297,12 @@ class FertilizacionViewSet(viewsets.ModelViewSet):
 				result = {
 					"success": True,
 					"message": "Fertilización registrada correctamente.",
+					"id": fertilizacion.id_fertilizacion,  # ✅ Agregar el id en el nivel raíz
 					"data": FertilizacionSerializer(fertilizacion).data,
 					"embryo": None
 				}
+				
+				
 
 				return Response(result, status=status.HTTP_201_CREATED)
 
@@ -312,5 +317,5 @@ class FertilizacionViewSet(viewsets.ModelViewSet):
 			logger.exception("Error inesperado al crear fertilización.")
 			return Response({
 				"success": False,
-				"message": "Ocurrió un error al registrar la fertilización."
+				"message": f"Ocurrió un error al registrar la fertilización: {str(e)}"
 			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
