@@ -138,6 +138,8 @@ class TratamientoViewSet(viewsets.ModelViewSet):
             # Obtener fertilizaciones relacionadas a esos ovocitos
             print(f"🔍 DEBUG: Obteniendo fertilizaciones...")
             fertilizaciones_data = []
+            fertilizaciones = []  # <-- Agrega esta línea
+
             if ovocitos_data:
                 ovocitos_ids = [o.get('id_ovocito') for o in ovocitos_data if o.get('id_ovocito')]
                 print(f"🔍 DEBUG: IDs de ovocitos para buscar fertilizaciones: {ovocitos_ids}")
@@ -146,9 +148,8 @@ class TratamientoViewSet(viewsets.ModelViewSet):
                     print(f"🔍 DEBUG: Encontradas {fertilizaciones.count()} fertilizaciones")
                     fertilizaciones_data = FertilizacionSerializer(fertilizaciones, many=True).data
                     print(f"🔍 DEBUG: Fertilizaciones serializadas: {len(fertilizaciones_data)} items")
-
-            # Obtener embriones relacionados a esas fertilizaciones
-            print(f"🔍 DEBUG: Obteniendo embriones...")
+                    # Obtener embriones relacionados a esas fertilizaciones
+                    print(f"🔍 DEBUG: Obteniendo embriones...")
 
             # ✅ Acceder desde las fertilizaciones usando el related_name
             embriones = []
