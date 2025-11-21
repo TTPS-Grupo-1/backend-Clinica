@@ -299,3 +299,37 @@ class MonitoreoViewSet(viewsets.ModelViewSet):
             "success": True,
             "data": serializer.data
         }, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['get'], url_path=r'atendidos-por-paciente/(?P<paciente_id>\d+)')
+    def atendidos_por_paciente(self, request, paciente_id=None):
+        """
+        Obtiene todos los monitoreos atendidos para un paciente específico
+        GET /api/monitoreo/monitoreos/atendidos-por-paciente/{paciente_id}/
+        """
+        monitoreos = self.get_queryset().filter(
+            tratamiento__paciente__id=paciente_id,
+            atendido=True
+        )
+        serializer = self.get_serializer(monitoreos, many=True)
+        return Response({
+            "success": True,
+            "count": monitoreos.count(),
+            "data": serializer.data
+        })
+    
+    @action(detail=False, methods=['get'], url_path=r'atendidos-por-tratamiento/(?P<tratamiento_id>\d+)')
+    def atendidos_por_tratamiento(self, request, tratamiento_id=None):
+        """
+        Obtiene todos los monitoreos atendidos para un tratamiento específico
+        GET /api/monitoreo/monitoreos/atendidos-por-tratamiento/{tratamiento_id}/
+        """
+        monitoreos = self.get_queryset().filter(
+            tratamiento_id=tratamiento_id,
+            atendido=True
+        )
+        serializer = self.get_serializer(monitoreos, many=True)
+        return Response({
+            "success": True,
+            "count": monitoreos.count(),
+            "data": serializer.data
+        })
