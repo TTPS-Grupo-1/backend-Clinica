@@ -23,6 +23,7 @@ from integrations.almacenamiento_proxy import almacenamiento_proxy
 from integrations.turnos_proxy import turnos_proxy_get, turnos_proxy_post, turnos_proxy_get_medico_fecha, turnos_proxy_reservar, turnos_proxy_get_turnos_paciente, turnos_proxy_cancelar 
 from integrations.almacenamiento_reserva_proxy import almacenamiento_reserva_proxy
 from integrations.gametos_donacion_proxy import gametos_donacion_proxy
+from integrations.gametos_proxy import gametos_proxy
 from Orden.views import OrdenesPacienteListView
 
 urlpatterns = [
@@ -39,12 +40,14 @@ urlpatterns = [
     path('api/logout/', LogoutAPIView.as_view(), name='logout'),
 
     path('api/almacenamiento/', almacenamiento_proxy),
+    path('api/gametos/', gametos_proxy),
     path('api/turnos/', turnos_proxy_get, name='turnos_proxy_get'),
     #path('turnos/consultar/', turnos_proxy_get, name='turnos_get_proxy'),
     path('api/turnos/consultar_medico_fecha/', turnos_proxy_get_medico_fecha, name='turnos_proxy_get_medico_fecha'),
     path('api/turnos/grilla/', turnos_proxy_post, name='turnos_post_proxy'),
     path('api/reservar_turno/', turnos_proxy_reservar, name='turnos_proxy_reservar'),
     path('api/donacion/', gametos_donacion_proxy),
+    path('api/local/turnos/', include('Turnos.urls')),
     path('api/tanques/registrar/', almacenamiento_reserva_proxy),
     path('api/turnos/mis_turnos/', turnos_proxy_get_turnos_paciente, name='turnos_proxy_get_turnos_paciente'),
     path('api/turnos/cancelar_turno/', turnos_proxy_cancelar, name='turnos_proxy_cancelar'),

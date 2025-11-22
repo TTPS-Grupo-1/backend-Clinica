@@ -49,7 +49,7 @@ class CreatePuncionMixin:
                                     "https://ssewaxrnlmnyizqsbzxe.supabase.co/functions/v1/assign-ovocyte",
                                     json={
                                         'nro_grupo': 1,
-                                        'ovocito_id': ovocito.id_ovocito
+                                        'ovocito_id': ovocito.identificador
                                     },
                                     headers={'Content-Type': 'application/json'}
                                 )

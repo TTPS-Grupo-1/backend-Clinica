@@ -194,31 +194,52 @@ class CreateSegundaConsultaMixin:
                     logger.error(f"❌ Error generando orden médica en Supabase: {e}")
                     
                 try:
+                    # 📩 Email del paciente y nombre del médico
                     paciente_email = tratamiento.paciente.email
                     medico_nombre = f"{tratamiento.medico.first_name} {tratamiento.medico.last_name}"
-                    
-                    subject = "Orden médica de medicación"
-                    message = (
-                        f"Hola {tratamiento.paciente.first_name},\n\n"
-                        f"Tu médico {medico_nombre} ha generado una nueva orden médica.\n"
-                        f"Podés consultar el PDF adjunto.\n\n"
-                        f"Saludos,\nClínica de Fertilidad"
+
+                    if not paciente_email:
+                        logger.warning("⚠️ Paciente sin email registrado, no se envía correo.")
+                        raise Exception("Paciente sin email")
+
+                    # 📄 URL ABSOLUTA al PDF guardado en el campo FileField
+                    #    Esto evita hardcodear HOST o DOMAIN
+                    #    Ejemplo: http://localhost:8000/media/segunda_consulta/orden_xxx.pdf
+                    pdf_url = request.build_absolute_uri(segunda.orden_droga_pdf.url)
+
+                    # 📨 Email HTML SEGURO (sin emojis ni caracteres que rompen la API)
+                    html_body = (
+                        f"<p>Hola {tratamiento.paciente.first_name},</p>"
+                        f"<p>Tu médico <strong>{medico_nombre}</strong> ha generado una nueva orden médica de medicación.</p>"
+                        f"<p>Puedes descargarla haciendo clic aquí:</p>"
+                        f"<p><a href=\"{pdf_url}\" target=\"_blank\">Descargar orden médica (PDF)</a></p>"
+                        f"<p>Saludos,<br>Clínica de Fertilidad</p>"
                     )
-                    
-                    email = EmailMessage(
-                        subject,
-                        message,
-                        settings.DEFAULT_FROM_EMAIL,
-                        [paciente_email],
-                    )
-                    
-                    email.attach(filename, pdf_bytes, "application/pdf")
-                    email.send()
-                    
-                    logger.info(f"📧 Orden médica enviada por email a {paciente_email}")
+
+                    # 🌐 API de Avisos (NO SOPORTA ADJUNTOS)
+                    url = "https://mvvuegssraetbyzeifov.supabase.co/functions/v1/send_email_v2"
+
+                    payload = {
+                        "group": 1,  # 🔥 tu grupo real: 8
+                        "toEmails": [paciente_email],
+                        "subject": "Orden medica de medicacion",
+                        "htmlBody": html_body,
+                    }
+
+                    headers = {"Content-Type": "application/json"}
+
+                    # 📤 Enviar mail por API
+                    resp_mail = requests.post(url, json=payload, headers=headers)
+
+                    if resp_mail.status_code == 200:
+                        logger.info(f"📧 Orden médica enviada correctamente a {paciente_email}")
+                    else:
+                        logger.error(f"❌ Error API avisos: {resp_mail.status_code} - {resp_mail.text}")
 
                 except Exception as e:
-                    logger.error(f"❌ Error enviando correo con la orden médica: {e}")
+                    logger.error(f"❌ Error enviando correo con la API de avisos: {e}")
+
+
 
                 # ---------- 8️⃣ Respuesta ----------
                 response_data = {

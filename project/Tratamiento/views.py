@@ -1,11 +1,11 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Q
 from .models import Tratamiento
 from .serializers import TratamientoSerializer, TratamientoCreateSerializer
-
+from rest_framework.decorators import action, permission_classes
 # Imports para detalles completos
 from Ovocito.models import Ovocito
 from Ovocito.serializers import OvocitoSerializer
@@ -20,7 +20,7 @@ class TratamientoViewSet(viewsets.ModelViewSet):
     ViewSet para manejar operaciones CRUD de tratamientos.
     """
     queryset = Tratamiento.objects.all()
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -138,6 +138,8 @@ class TratamientoViewSet(viewsets.ModelViewSet):
             # Obtener fertilizaciones relacionadas a esos ovocitos
             print(f"🔍 DEBUG: Obteniendo fertilizaciones...")
             fertilizaciones_data = []
+            fertilizaciones = []  # <-- Agrega esta línea
+
             if ovocitos_data:
                 ovocitos_ids = [o.get('id_ovocito') for o in ovocitos_data if o.get('id_ovocito')]
                 print(f"🔍 DEBUG: IDs de ovocitos para buscar fertilizaciones: {ovocitos_ids}")
@@ -146,9 +148,8 @@ class TratamientoViewSet(viewsets.ModelViewSet):
                     print(f"🔍 DEBUG: Encontradas {fertilizaciones.count()} fertilizaciones")
                     fertilizaciones_data = FertilizacionSerializer(fertilizaciones, many=True).data
                     print(f"🔍 DEBUG: Fertilizaciones serializadas: {len(fertilizaciones_data)} items")
-
-            # Obtener embriones relacionados a esas fertilizaciones
-            print(f"🔍 DEBUG: Obteniendo embriones...")
+                    # Obtener embriones relacionados a esas fertilizaciones
+                    print(f"🔍 DEBUG: Obteniendo embriones...")
 
             # ✅ Acceder desde las fertilizaciones usando el related_name
             embriones = []
@@ -210,7 +211,7 @@ class TratamientoViewSet(viewsets.ModelViewSet):
                 {"detail": f"No se encontró tratamiento activo para el paciente {paciente_id}."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-
+        print(f"🧩 Tratamientos encontrados: {tratamientos.count()}")
         tratamiento = tratamientos.first()
         serializer = self.get_serializer(tratamiento)
         return Response(serializer.data, status=status.HTTP_200_OK)
