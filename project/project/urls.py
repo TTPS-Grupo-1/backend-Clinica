@@ -25,6 +25,7 @@ from integrations.almacenamiento_reserva_proxy import almacenamiento_reserva_pro
 from integrations.gametos_donacion_proxy import gametos_donacion_proxy
 from integrations.gametos_proxy import gametos_proxy
 from Orden.views import OrdenesPacienteListView
+from CustomUser.views.views import DeudaPacienteView    
 
 urlpatterns = [
     path('admin/', admin.site.urls),

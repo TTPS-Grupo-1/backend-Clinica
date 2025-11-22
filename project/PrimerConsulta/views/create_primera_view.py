@@ -312,7 +312,7 @@ class CreatePrimeraConsultaMixin:
                 medico = CustomUser.objects.get(id=medico_id)
                
                 # Crear el tratamiento vinculado a esta primera consulta
-                Tratamiento.objects.create(
+                tratamiento = Tratamiento.objects.create(
                     paciente=paciente,
                     medico=medico,
                     primera_consulta=consulta,
@@ -446,9 +446,11 @@ class CreatePrimeraConsultaMixin:
                 print("Datos de la orden de pago:")
                 print("Grupo:", 1)
                 print("ID Paciente:", paciente.id)
-                print("Monto:", 10000.0)
-                registrar_orden_pago(paciente.id, paciente.obra_social, 1, 10000.0)
-                
+                print("Monto:", 1000000)
+                pago = registrar_orden_pago(paciente.id, paciente.obra_social, 1, 1000000)
+                id_pago = pago.get("pago", {}).get("id")
+                tratamiento.id_pago = id_pago
+                tratamiento.save()
 
 
 

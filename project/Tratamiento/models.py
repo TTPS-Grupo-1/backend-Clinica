@@ -80,6 +80,12 @@ class Tratamiento(models.Model):
         related_name='tratamientos',
         help_text="Turnos asociados a este tratamiento"
     )
+    
+    id_pago = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="ID del pago asociado al tratamiento"
+    )
 
     class Meta:
         verbose_name = "Tratamiento"
