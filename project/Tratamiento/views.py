@@ -13,6 +13,18 @@ from Fertilizacion.models import Fertilizacion
 from Fertilizacion.serializers import FertilizacionSerializer
 from Embrion.models import Embrion
 from Embrion.serializers import EmbrionSerializer
+from AntecedentesGinecologicos.models import AntecedentesGinecologicos
+from AntecedentesGinecologicos.serializers import AntecedentesGinecologicosSerializer
+from AntecedentesPersonales.models import AntecedentesPersonales
+from AntecedentesPersonales.serializers import AntecedentesPersonalesSerializer
+from ResultadoEstudio.models import ResultadoEstudio
+from ResultadoEstudio.serializers import ResultadoEstudioSerializer
+from Orden.models import Orden
+from Orden.serializers import OrdenDescargaSerializer
+from PrimerConsulta.models import PrimeraConsulta
+from PrimerConsulta.serializers import PrimeraConsultaSerializer
+from SegundaConsulta.models import SegundaConsulta
+from SegundaConsulta.serializers import SegundaConsultaSerializer
 
 
 class TratamientoViewSet(viewsets.ModelViewSet):
@@ -168,12 +180,70 @@ class TratamientoViewSet(viewsets.ModelViewSet):
             embriones_data = EmbrionSerializer(embriones, many=True).data
             print(f"🔍 DEBUG: Embriones serializados: {len(embriones_data)} items")
 
+            # Obtener datos relacionados con primera consulta
+            print(f"🔍 DEBUG: Obteniendo datos de primera consulta...")
+            primera_consulta_data = None
+            antecedentes_ginecologicos_data = []
+            antecedentes_personales_data = []
+            resultados_estudios_data = []
+            ordenes_data = []
+            
+            if tratamiento.primera_consulta:
+                primera_consulta = tratamiento.primera_consulta
+                print(f"🔍 DEBUG: Tratamiento tiene primera consulta: {primera_consulta.id}")
+                
+                # 🔥 NUEVO: Serializar los datos de la tabla PrimeraConsulta
+                primera_consulta_data = PrimeraConsultaSerializer(primera_consulta).data
+                print(f"🔍 DEBUG: Datos de primera consulta serializados")
+                
+                # Antecedentes Ginecológicos
+                antecedentes_gin = AntecedentesGinecologicos.objects.filter(consulta=primera_consulta)
+                antecedentes_ginecologicos_data = AntecedentesGinecologicosSerializer(antecedentes_gin, many=True).data
+                print(f"🔍 DEBUG: Encontrados {antecedentes_gin.count()} antecedentes ginecológicos")
+                
+                # Antecedentes Personales
+                antecedentes_pers = AntecedentesPersonales.objects.filter(consulta=primera_consulta)
+                antecedentes_personales_data = AntecedentesPersonalesSerializer(antecedentes_pers, many=True).data
+                print(f"🔍 DEBUG: Encontrados {antecedentes_pers.count()} antecedentes personales")
+                
+                # Resultados de Estudios
+                resultados = ResultadoEstudio.objects.filter(consulta=primera_consulta)
+                resultados_estudios_data = ResultadoEstudioSerializer(resultados, many=True).data
+                print(f"🔍 DEBUG: Encontrados {resultados.count()} resultados de estudios")
+                
+                # Órdenes
+                ordenes = Orden.objects.filter(primera_consulta=primera_consulta)
+                ordenes_data = OrdenDescargaSerializer(ordenes, many=True).data
+                print(f"🔍 DEBUG: Encontradas {ordenes.count()} órdenes")
+            else:
+                print(f"🔍 DEBUG: Tratamiento sin primera consulta")
+            
+            # Obtener datos relacionados con segunda consulta
+            print(f"🔍 DEBUG: Obteniendo datos de segunda consulta...")
+            segunda_consulta_data = None
+            
+            if tratamiento.segunda_consulta:
+                segunda_consulta = tratamiento.segunda_consulta
+                print(f"🔍 DEBUG: Tratamiento tiene segunda consulta: {segunda_consulta.id}")
+                
+                # 🔥 NUEVO: Serializar los datos de la tabla SegundaConsulta
+                segunda_consulta_data = SegundaConsultaSerializer(segunda_consulta).data
+                print(f"🔍 DEBUG: Datos de segunda consulta serializados")
+            else:
+                print(f"🔍 DEBUG: Tratamiento sin segunda consulta")
+
             print(f"🔍 DEBUG: Preparando respuesta final...")
             response_data = {
                 'tratamiento': tratamiento_data,
                 'ovocitos': ovocitos_data,
                 'fertilizaciones': fertilizaciones_data,
-                'embriones': embriones_data
+                'embriones': embriones_data,
+                'primera_consulta': primera_consulta_data,  # 🔥 NUEVO: Datos completos de primera consulta
+                'segunda_consulta': segunda_consulta_data,  # 🔥 NUEVO: Datos completos de segunda consulta
+                'antecedentes_ginecologicos': antecedentes_ginecologicos_data,
+                'antecedentes_personales': antecedentes_personales_data,
+                'resultados_estudios': resultados_estudios_data,
+                'ordenes': ordenes_data
             }
             print(f"🔍 DEBUG: Respuesta preparada, enviando...")
             return Response(response_data, status=status.HTTP_200_OK)
