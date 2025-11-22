@@ -59,6 +59,7 @@ urlpatterns = [
     path('api/historial_ovocitos/', include('Historial_ovocito.urls')),
     path('mis_ordenes/', OrdenesPacienteListView.as_view(), name='ordenes_paciente_list'),
     path('api/', include('Turnos.urls')),
+    path('api/seguimiento/', include('Seguimiento.urls')),
 ]
 
 if settings.DEBUG:

@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     'seed_data',  # ✅ Agregar al final
     'Embrion.apps.EmbrionConfig',  # ✅ Usar la clase Config, no solo 'Embrion'
     'Historial_embrion',
+    'Seguimiento',
 ]
 
 AUTH_USER_MODEL = 'CustomUser.CustomUser'
