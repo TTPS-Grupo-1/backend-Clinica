@@ -88,7 +88,7 @@ class CreatePrimeraConsultaMixin:
             return Response(
                 {
                     "success": False,
-                    "message": "El paciente tiene una deuda pendiente. No se puede crear la consulta.",
+                    "message": "El paciente tiene una deuda pendiente. No se puede iniciar un nuevo tratamiento.",
                     "deuda": deuda
                 },
                 status=status.HTTP_400_BAD_REQUEST,
