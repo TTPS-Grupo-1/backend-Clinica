@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from CustomUser.models import CustomUser
+from Tratamiento.models import Tratamiento
 
 
 SUPABASE_OBRAS = "https://ueozxvwsckonkqypfasa.supabase.co/functions/v1/getObrasSociales"
@@ -165,5 +166,84 @@ class PacientesFinanzasView(APIView):
             })
 
         return Response(resultados, status=status.HTTP_200_OK)
+    
+class CobrarObraSocialView(APIView):
+    SUPABASE_REGISTRAR_PAGO = "https://ueozxvwsckonkqypfasa.supabase.co/functions/v1/registrar-pago-obra-social"
+    GRUPO = 1  # o el número que uses
+
+    def post(self, request):
+
+        id_obra_social = request.data.get("id_obra_social")
+        print("Iniciando proceso de cobro para obra social ID:", id_obra_social)
+
+        if not id_obra_social:
+            return Response(
+                {"error": "El parámetro id_obra_social es requerido."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 1) Pacientes con esa obra social
+        pacientes = CustomUser.objects.filter(
+            obra_social=id_obra_social,
+            rol="PACIENTE",
+            eliminado=False
+        )
+        print(f"Se encontraron {pacientes.count()} pacientes con obra social ID {id_obra_social}.")
+
+        # 2) Tratamientos con id_pago
+        tratamientos = Tratamiento.objects.filter(
+            paciente__in=pacientes,
+            id_pago__isnull=False
+        )
+        if not tratamientos.exists():
+            return Response(
+                {"message": "No hay pagos pendientes para esta obra social."},
+                status=status.HTTP_200_OK
+        )
+        print(f"Se encontraron {tratamientos.count()} tratamientos con pagos pendientes.")
+        resultados = []
+
+            # 3) Llamar al endpoint Supabase por cada pago
+        for t in tratamientos:
+            try:
+                resp = requests.post(
+                    self.SUPABASE_REGISTRAR_PAGO,
+                    json={
+                        "id_grupo": self.GRUPO,
+                        "id_pago": t.id_pago,
+                        "obra_social_pagada": True,
+                        "paciente_pagado": False
+                    },
+                    timeout=10
+                )
+                data = resp.json()
+                print(data)
+
+                if resp.status_code == 200:
+                    resultados.append({
+                        "tratamiento_id": t.id,
+                        "id_pago": t.id_pago,
+                        "respuesta": data
+                    })
+                else:
+                    print(data)
+                    print("Error al registrar pago en Supabase")
+                    resultados.append({
+                        "tratamiento_id": t.id,
+                        "id_pago": t.id_pago,
+                        "error": data
+                    })
+            except Exception as e:
+                resultados.append({
+                    "tratamiento_id": t.id,
+                    "id_pago": t.id_pago,
+                    "error": str(e)
+                })
+        return Response({
+            "obra_social": id_obra_social,
+            "total_pagos_procesados": len(resultados),
+            "detalles": resultados
+        }, status=status.HTTP_200_OK)
+
 
 

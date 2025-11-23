@@ -28,6 +28,7 @@ from Orden.views import OrdenesPacienteListView
 from CustomUser.views.views import DeudaPacienteView
 from Administrador.views import ObrasSocialesFinanzasView    
 from Administrador.views import PacientesFinanzasView
+from Administrador.views import CobrarObraSocialView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -68,6 +69,7 @@ urlpatterns = [
     path('api/seguimiento/', include('Seguimiento.urls')),
     path('api/finanzas/obras-sociales/', ObrasSocialesFinanzasView.as_view(), name='finanzas_obras_sociales'),
     path('api/finanzas/pacientes/', PacientesFinanzasView.as_view(), name='finanzas_pacientes'),
+    path('api/finanzas/cobrar-obra-social/', CobrarObraSocialView.as_view(), name='cobrar_obra_social'),
 ]
 
 if settings.DEBUG:
