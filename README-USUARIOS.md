@@ -12,8 +12,13 @@ Este archivo lista las credenciales que el script de seed (`init_db`) crea por d
 | lucia.gomez@email.com | `12345678` | PACIENTE | Paciente de prueba
 | sofia.rodriguez@email.com | `12345678` | PACIENTE | Paciente de prueba
 | operador.lab@clinica.com | `labpass123` | OPERADOR_LABORATORIO | Operador de laboratorio (tests/manuales)
+| director.medico@clinica.com | `12345678` | MEDICO | Director medico (es un medico mas con el boolean de director medico en true)
+| admin@email.com | `12345678` | ADMIN | ADMIN
 
 
+
+
+admin@email.com
 Cómo (re)crear estos usuarios
 
 1. Desde la raíz del proyecto Django ejecuta el comando de seed:

@@ -349,6 +349,27 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(f'  ⚠️  {medico.first_name} {medico.last_name} (ya existía)')
             medicos.append(medico)
+            
+            
+        #Crear director medico 
+        director_medico, created = CustomUser.objects.get_or_create(
+            email='director.medico@clinica.com',
+            defaults={
+                'first_name': 'Director',
+                'last_name': 'Médico',
+                'dni': 32343424,
+                'telefono': '2214000001',
+                'rol': 'MEDICO',
+                'is_active': True,
+                'is_director': True,
+            }
+        )
+        if created:
+            director_medico.set_password('12345678')
+            director_medico.save()
+            self.stdout.write(f'  ✅ {director_medico.first_name} {director_medico.last_name}')
+        else:
+            self.stdout.write(f'  ⚠️  {director_medico.first_name} {director_medico.last_name} (ya existía)')
 
         # =====================================
         # 2. CREAR PACIENTES
