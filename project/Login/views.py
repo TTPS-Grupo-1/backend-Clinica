@@ -65,6 +65,7 @@ class LoginAPIView(APIView):
                 "telefono": user.telefono,
                 "rol": user.rol,
                 "gender": user.sexo,
+                "is_director": user.is_director,
             }
         }, status=status.HTTP_200_OK)
 
