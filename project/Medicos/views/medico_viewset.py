@@ -29,11 +29,14 @@ class MedicoViewSet(viewsets.ModelViewSet):
     # 🔹 Crear médico (forzando el rol)
     # --------------------------------------------------------
     def perform_create(self, serializer):
+        print("Creating a new medico")
+        is_director = self.request.data.get('is_director', False)
+        is_director = True if str(is_director).lower() == 'true' else False
+        logger.info(f"📥 Datos recibidos en create: {self.request.data}")
         password = self.request.data.get('password')
         if not password:
             raise ValueError("El campo 'password' es obligatorio para crear un médico.")
-        serializer.save(password=password, rol='MEDICO')
-
+        serializer.save(password=password, rol='MEDICO', is_director=is_director)
     # --------------------------------------------------------
     # 🔹 Actualizar médico
     # --------------------------------------------------------

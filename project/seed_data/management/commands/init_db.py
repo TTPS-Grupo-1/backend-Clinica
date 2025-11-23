@@ -947,6 +947,7 @@ class Command(BaseCommand):
         )
         admin_user.set_password('12345678')
         admin_user.save()
+        
 
         # ----------------
         # PACIENTE 1: Primera consulta completada (próximo: Segunda consulta)
