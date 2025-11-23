@@ -2,8 +2,6 @@ import requests
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from Tratamiento.models import Tratamiento
 from CustomUser.models import CustomUser
 
 
@@ -87,7 +85,7 @@ class ObrasSocialesFinanzasView(APIView):
                 "nombre": nombre,
                 "total_deuda": deuda,
                 "total_cobrado": cobrado,
-                "saldo_pendiente": deuda - cobrado
+                "saldo_pendiente": deuda - cobrado if (deuda - cobrado) > 0 else 0
             })
 
         return Response(resultados, status=status.HTTP_200_OK)
@@ -102,7 +100,26 @@ class PacientesFinanzasView(APIView):
 
     def get(self, request):
 
-        pacientes = CustomUser.objects.filter(rol="PACIENTE")
+        # -----------------------------
+        # 1) Obtener obras sociales
+        # -----------------------------
+        try:
+            obras_resp = requests.get(SUPABASE_OBRAS, timeout=10)
+            obras_data = obras_resp.json().get("data", [])
+        except:
+            obras_data = []
+
+        # Crear diccionario: id → obra social
+        obras_dict = {obra["id"]: obra for obra in obras_data}
+
+        # -----------------------------
+        # 2) Obtener pacientes con obra social asignada
+        # -----------------------------
+        pacientes = CustomUser.objects.filter(
+            rol="PACIENTE"
+        ).exclude(
+            obra_social__isnull=True
+        )
 
         resultados = []
 
@@ -127,13 +144,26 @@ class PacientesFinanzasView(APIView):
             )
             cobrado = cobrado_resp.json().get("total_cobrado", 0)
 
+            # Excluir si no hay movimientos
+            if deuda == 0 and cobrado == 0:
+                continue
+
+            # Obtener sigla y nombre de la obra social
+            obra_social_info = obras_dict.get(obra_social_id, {})
+            obra_sigla = obra_social_info.get("sigla", "N/D")
+            obra_nombre = obra_social_info.get("nombre", "N/D")
+
             resultados.append({
                 "id": id_paciente,
                 "nombre": nombre,
                 "obra_social_id": obra_social_id,
+                "obra_social_sigla": obra_sigla,
+                "obra_social_nombre": obra_nombre,
                 "total_deuda": deuda,
                 "total_cobrado": cobrado,
-                "saldo_pendiente": deuda - cobrado
+                "saldo_pendiente": deuda - cobrado if (deuda - cobrado) > 0 else 0
             })
 
         return Response(resultados, status=status.HTTP_200_OK)
+
+
