@@ -932,6 +932,21 @@ class Command(BaseCommand):
         # AGREGAR 3 PACIENTES EXTRA CON DIFERENTES ESTADOS DE TRATAMIENTO
         # =====================================
         self.stdout.write('\n➕ Agregando 3 pacientes extra con diferentes estados...')
+        
+        #Agrego administrador 
+        admin_user, _ = CustomUser.objects.get_or_create(
+            email='admin@email.com',
+            defaults={
+                'first_name': 'Admin',
+                'last_name': 'User',
+                'dni':  4456789023,
+                'telefono': '2215678901',
+                'rol': 'ADMIN',
+                'is_active': True,
+            }
+        )
+        admin_user.set_password('12345678')
+        admin_user.save()
 
         # ----------------
         # PACIENTE 1: Primera consulta completada (próximo: Segunda consulta)

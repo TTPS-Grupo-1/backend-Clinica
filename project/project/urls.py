@@ -25,7 +25,9 @@ from integrations.almacenamiento_reserva_proxy import almacenamiento_reserva_pro
 from integrations.gametos_donacion_proxy import gametos_donacion_proxy
 from integrations.gametos_proxy import gametos_proxy
 from Orden.views import OrdenesPacienteListView
-from CustomUser.views.views import DeudaPacienteView    
+from CustomUser.views.views import DeudaPacienteView
+from Administrador.views import ObrasSocialesFinanzasView    
+from Administrador.views import PacientesFinanzasView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -64,6 +66,8 @@ urlpatterns = [
     path('mis_ordenes/', OrdenesPacienteListView.as_view(), name='ordenes_paciente_list'),
     path('api/', include('Turnos.urls')),
     path('api/seguimiento/', include('Seguimiento.urls')),
+    path('api/finanzas/obras-sociales/', ObrasSocialesFinanzasView.as_view(), name='finanzas_obras_sociales'),
+    path('api/finanzas/pacientes/', PacientesFinanzasView.as_view(), name='finanzas_pacientes'),
 ]
 
 if settings.DEBUG:
