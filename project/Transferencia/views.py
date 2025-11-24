@@ -60,3 +60,26 @@ class TransferenciaViewSet(viewsets.ModelViewSet):
 
         out = TransferenciaReadSerializer(transferencia)
         return Response(out.data, status=201)
+
+    @action(detail=False, methods=['get'], url_path=r'transferencias-por-tratamiento/(?P<tratamiento_id>\d+)')
+    def transferencias_por_tratamiento(self, request, tratamiento_id=None):
+        """
+        Devuelve todas las transferencias asociadas a un tratamiento específico.
+        GET /api/transferencias/transferencias-por-tratamiento/{tratamiento_id}/
+        """
+        transferencias = self.get_queryset().filter(tratamiento_id=tratamiento_id)
+        serializer = TransferenciaReadSerializer(transferencias, many=True)
+        return Response({
+            "success": True,
+            "count": transferencias.count(),
+            "data": serializer.data
+        }, status=200)
+
+    @action(detail=False, methods=['get'], url_path=r'existe-transferencia/(?P<paciente_id>\d+)')
+    def existe_transferencia(self, request, paciente_id=None):
+        """
+        Devuelve si existe alguna transferencia para el paciente dado.
+        GET /api/transferencias/existe-transferencia/{paciente_id}/
+        """
+        existe = Transferencia.objects.filter(tratamiento__paciente_id=paciente_id).exists()
+        return Response({'existe_transferencia': existe})
