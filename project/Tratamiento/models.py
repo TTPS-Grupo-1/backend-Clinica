@@ -131,7 +131,13 @@ class Tratamiento(models.Model):
         # Verificar si tiene monitoreos
         monitoreos = self.lista_monitoreos.all()
         if monitoreos.exists():
-            return 'Monitoreos'
+            # Verificar si todos los monitoreos están atendidos/finalizados
+            monitoreos_pendientes = monitoreos.filter(atendido=False)
+            if monitoreos_pendientes.exists():
+                return 'Monitoreos'
+            else:
+                # Todos los monitoreos están finalizados
+                return 'Monitoreos finalizados'
         
         # Verificar si tiene segunda consulta
         if self.segunda_consulta:

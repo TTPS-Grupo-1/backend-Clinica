@@ -375,3 +375,101 @@ class TratamientoViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK
         )
+
+    @action(detail=False, methods=['post'], url_path='filtrar_estado', url_name='filtrar_estado')
+    def filtrar_pacientes_por_estado(self, request):
+        """
+        Filtra pacientes que tienen tratamientos activos con un estado específico.
+        
+        POST /api/tratamientos/filtrar_estado/
+        
+        Body JSON:
+        {
+            "estado": "Monitoreos finalizados",
+            "pacientes_ids": [1, 2, 3, 4, 5]
+        }
+        
+        Respuesta:
+        {
+            "estado_buscado": "Monitoreos finalizados",
+            "pacientes_que_cumplen": [
+                {
+                    "paciente_id": 2,
+                    "tratamiento_id": 15,
+                    "estado_actual": "Monitoreos finalizados"
+                },
+                {
+                    "paciente_id": 4,
+                    "tratamiento_id": 23,
+                    "estado_actual": "Monitoreos finalizados"
+                }
+            ],
+            "total_encontrados": 2,
+            "total_revisados": 5
+        }
+        """
+        try:
+            # Validar datos de entrada
+            estado_buscado = request.data.get('estado', '').strip()
+            pacientes_ids = request.data.get('pacientes_ids', [])
+            
+            if not estado_buscado:
+                return Response(
+                    {"error": "El campo 'estado' es requerido"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if not isinstance(pacientes_ids, list) or not pacientes_ids:
+                return Response(
+                    {"error": "El campo 'pacientes_ids' debe ser un array no vacío"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validar que todos los elementos sean enteros
+            try:
+                pacientes_ids = [int(pid) for pid in pacientes_ids]
+            except (ValueError, TypeError):
+                return Response(
+                    {"error": "Todos los elementos en 'pacientes_ids' deben ser números enteros"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            print(f"🔍 Buscando pacientes con estado '{estado_buscado}' entre IDs: {pacientes_ids}")
+            
+            # Buscar tratamientos activos de los pacientes especificados
+            tratamientos_activos = (
+                Tratamiento.objects
+                .select_related('paciente', 'medico', 'primera_consulta', 'segunda_consulta', 'puncion', 'transferencia')
+                .prefetch_related('lista_monitoreos')
+                .filter(paciente_id__in=pacientes_ids, activo=True)
+            )
+            
+            pacientes_que_cumplen = []
+            
+            # Evaluar el estado de cada tratamiento
+            for tratamiento in tratamientos_activos:
+                estado_actual = tratamiento.estado_actual
+                print(f"  📋 Paciente {tratamiento.paciente_id} - Tratamiento {tratamiento.id} - Estado: '{estado_actual}'")
+                
+                if estado_actual == estado_buscado:
+                    pacientes_que_cumplen.append({
+                        "paciente_id": tratamiento.paciente_id,
+                        "tratamiento_id": tratamiento.id,
+                        "estado_actual": estado_actual
+                    })
+            
+            print(f"✅ Encontrados {len(pacientes_que_cumplen)} pacientes que cumplen el criterio")
+            
+            return Response({
+                "estado_buscado": estado_buscado,
+                "pacientes_que_cumplen": pacientes_que_cumplen,
+                "total_encontrados": len(pacientes_que_cumplen),
+                "total_revisados": len(pacientes_ids)
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"🚨 ERROR en filtrar_pacientes_por_estado: {str(e)}")
+            return Response(
+                {"error": f"Error interno del servidor: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
