@@ -95,3 +95,51 @@ class Tratamiento(models.Model):
     def __str__(self):
         # `nombre` no existe en este modelo; usar id y paciente para evitar AttributeError
         return f"Tratamiento #{self.id} - {self.paciente.get_full_name() or self.paciente.username}"
+    
+    @property
+    def estado_actual(self):
+        """
+        Calcula y devuelve el estado actual del tratamiento basándose en los datos relacionados.
+        Replica la lógica del frontend getEstadoTexto pero del lado del servidor.
+        """
+        # Si el tratamiento no está activo, está finalizado
+        if not self.activo:
+            return 'Finalizado'
+        
+        # Verificar si tiene seguimiento y está finalizado
+        if hasattr(self, 'seguimiento_beta') and self.seguimiento_beta:
+            return 'Finalizado'
+        
+        # Verificar si tiene transferencia
+        if self.transferencia:
+            return 'Transferencia'
+        
+        # Verificar si tiene fertilizaciones a través de la punción
+        if self.puncion:
+            # Importar aquí para evitar circular imports
+            from Fertilizacion.models import Fertilizacion
+            fertilizaciones = Fertilizacion.objects.filter(
+                ovocito__puncion=self.puncion
+            )
+            if fertilizaciones.exists():
+                return 'Fertilización'
+        
+        # Verificar si tiene punción
+        if self.puncion:
+            return 'Punción'
+        
+        # Verificar si tiene monitoreos
+        monitoreos = self.lista_monitoreos.all()
+        if monitoreos.exists():
+            return 'Monitoreos'
+        
+        # Verificar si tiene segunda consulta
+        if self.segunda_consulta:
+            return 'Segunda consulta'
+        
+        # Verificar si tiene primera consulta
+        if self.primera_consulta:
+            return 'Primera consulta'
+        
+        # Estado por defecto si acaba de ser creado
+        return 'En proceso'
