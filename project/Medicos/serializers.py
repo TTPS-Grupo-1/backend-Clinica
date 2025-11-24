@@ -9,6 +9,9 @@ class MedicoSerializer(serializers.ModelSerializer):
         min_length=8,
         allow_blank=False
     )
+
+    
+    
     
     class Meta:
         model = Medico

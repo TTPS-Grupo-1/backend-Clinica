@@ -473,3 +473,12 @@ class TratamientoViewSet(viewsets.ModelViewSet):
                 {"error": f"Error interno del servidor: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    @action(detail=False, methods=['get'], url_path=r'tiene-tratamientos-activos/(?P<medico_id>\d+)')
+    def tiene_tratamientos_activos(self, request, medico_id=None):
+        """
+        Devuelve true si el médico tiene al menos un tratamiento activo.
+        GET /api/tratamientos/tiene-tratamientos-activos/<medico_id>/
+        """
+        existe = Tratamiento.objects.filter(medico_id=medico_id, activo=True).exists()
+        return Response({'tiene_tratamientos_activos': existe})
