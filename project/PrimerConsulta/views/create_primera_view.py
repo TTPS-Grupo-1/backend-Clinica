@@ -76,6 +76,19 @@ class CreatePrimeraConsultaMixin:
         )
         
         print("paciente_id:", paciente_id)
+        url = f"http://127.0.0.1:8000/api/tratamientos/por-paciente/{paciente_id}/"
+
+        resp = requests.get(url)
+        
+        if resp.status_code != 404:
+            return Response(
+                {
+                    "success": False,
+                    "message": "El paciente ya tiene un tratamiento activo. No se puede iniciar un nuevo tratamiento.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
         SUPABASE_DEUDA_PACIENTE = "https://ueozxvwsckonkqypfasa.supabase.co/functions/v1/deuda-paciente"
         GRUPO = 1
         deuda_resp = requests.post(
