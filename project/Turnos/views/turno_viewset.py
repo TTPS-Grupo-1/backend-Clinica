@@ -112,3 +112,12 @@ class TurnoViewSet(CreateTurnoMixin, viewsets.ModelViewSet):
         except Exception as e:
             print(f"❌ Error marcando turno como atendido: {e}")
             return Response({'detail': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['get'], url_path='tiene-turnos-pendientes/(?P<id_medico>\d+)')
+    def tiene_turnos_pendientes(self, request, id_medico=None):
+        """
+        Devuelve si el médico tiene al menos un turno pendiente (atendido=False).
+        GET /api/turnos/tiene-turnos-pendientes/<id_medico>/
+        """
+        existe = Turno.objects.filter(Medico_id=id_medico, atendido=False).exists()
+        return Response({'tiene_turnos_pendientes': existe})
