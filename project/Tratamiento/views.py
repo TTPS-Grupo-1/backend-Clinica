@@ -334,3 +334,44 @@ class TratamientoViewSet(viewsets.ModelViewSet):
                 {"error": f"Error al cancelar el tratamiento: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    @action(detail=False, methods=['get'], url_path=r'estado/(?P<paciente_id>\d+)')
+    def estado_actual_trat_activos(self, request, paciente_id=None):
+        """
+        Devuelve el estado actual del único tratamiento activo del paciente especificado.
+        Un paciente solo puede tener un tratamiento activo a la vez.
+        Ejemplo: /api/tratamientos/estado/123/
+        """
+        print(f"🧩 Buscando estado actual del tratamiento activo para paciente_id={paciente_id}")
+        
+        # Buscar el tratamiento activo del paciente (solo debería haber uno)
+        tratamiento_activo = (
+            Tratamiento.objects
+            .select_related('paciente', 'medico', 'primera_consulta', 'segunda_consulta', 'puncion', 'transferencia')
+            .prefetch_related('lista_monitoreos')
+            .filter(paciente_id=paciente_id, activo=True)
+            .first()
+        )
+
+        if not tratamiento_activo:
+            return Response(
+                {
+                    "paciente_id": paciente_id, 
+                    "estado_actual": None,
+                    "message": "No se encontró tratamiento activo para este paciente"
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Usar la propiedad estado_actual del modelo
+        estado = tratamiento_activo.estado_actual
+        print(f"🧩 Estado encontrado: {estado}")
+
+        return Response(
+            {
+                "paciente_id": paciente_id, 
+                "tratamiento_id": tratamiento_activo.id,
+                "estado_actual": estado
+            },
+            status=status.HTTP_200_OK
+        )
