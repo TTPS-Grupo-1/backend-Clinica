@@ -47,10 +47,47 @@ class SeguimientoRegistroSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Error interno al verificar el tratamiento.")
             
         return data
+    
+    def _generar_motivo_finalizacion(self, data):
+        if data.get('nacido_vivo'):
+            return "Nacido vivo registrado"
+
+        if data.get('embarazo_clinico'):
+            return "Embarazo clínico confirmado"
+
+        if data.get('hay_saco_gestacional'):
+            return "Saco gestacional detectado"
+
+        beta = data.get('resultado_beta')
+        
+        if beta is not None:
+            if beta > 5:
+                return f"Beta positiva ({beta} mUI/mL)"
+            else:
+                return f"Beta negativa ({beta} mUI/mL)"
+
+        return "Seguimiento finalizado sin resultados concluyentes"
+
 
     def create(self, validated_data):
-        # Eliminamos el campo extra que no pertenece al modelo
+        # 1. Eliminar campo que no pertenece al modelo
         validated_data.pop('paciente_id')
-        
-        # 💡 El campo 'tratamiento' ahora contiene la instancia del objeto Tratamiento
-        return SeguimientoTratamiento.objects.create(**validated_data)
+
+        # 2. Recuperar tratamiento pasado desde validate()
+        tratamiento = validated_data.pop('tratamiento')
+
+        # 3. Crear seguimiento asociado
+        seguimiento = SeguimientoTratamiento.objects.create(
+            **validated_data,
+            tratamiento=tratamiento
+        )
+
+        # 4. Generar motivo de finalización automáticamente
+        motivo = self._generar_motivo_finalizacion(validated_data)
+
+        # 5. Marcar tratamiento como inactivo y guardar motivo
+        tratamiento.activo = False
+        tratamiento.motivo_finalizacion = motivo
+        tratamiento.save(update_fields=['activo', 'motivo_finalizacion'])
+
+        return seguimiento
