@@ -115,6 +115,7 @@ class CreateSegundaConsultaMixin:
                                         Medico=tratamiento.medico,
                                         fecha_hora=fecha_atencion,
                                         id_externo=id_turno,
+                                        es_monitoreo=True,
                                     )
                                     
                                 else:
