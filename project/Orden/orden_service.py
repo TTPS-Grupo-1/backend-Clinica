@@ -1,39 +1,40 @@
-import requests
+import os
 import json
 import re
 import unicodedata
-from io import BytesIO
-from supabase import create_client
+import requests
+
 from django.conf import settings
+from django.core.files.storage import FileSystemStorage
+from django.core.files.base import ContentFile
+
 from Orden.models import Orden
 
 
-# ⚙️ Configuración Supabase (valores fijos por ahora)
-SUPABASE_URL = "https://srlgceodssgoifgosyoh.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNybGdjZW9kc3Nnb2lmZ29zeW9oIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MDQ0NTU3NiwiZXhwIjoyMDc2MDIxNTc2fQ.4KDD7JytM2J8jMxl6WmYyTArThY4Dd8s6ACJZdYMJMY"
-SUPABASE_FUNCTION_URL = f"{SUPABASE_URL}/functions/v1/generar_orden_medica"
-BUCKET = "ordenes"
-
-# Crear cliente Supabase
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+# ⚙️ URL de tu Edge Function que genera el PDF
+SUPABASE_FUNCTION_URL = "https://srlgceodssgoifgosyoh.supabase.co/functions/v1/generar_orden_medica"
 
 
 def clean_filename(text: str) -> str:
-    """Convierte texto a un nombre de archivo seguro (sin tildes, ñ, ni símbolos)."""
+    """Normaliza un texto para usarlo como nombre de archivo."""
     if not text:
         return "archivo"
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
-    text = re.sub(r"[^a-zA-Z0-9_]+", "_", text.lower()).strip("_")
-    return text
+    return re.sub(r"[^a-zA-Z0-9_]+", "_", text.lower()).strip("_")
 
 
 def generar_orden_y_guardar(consulta, tipo_estudio, determinaciones, medico, paciente, acompañante):
     """
-    Genera una orden médica (PDF) usando una Edge Function de Supabase,
-    la sube a Supabase Storage y la guarda en la base local.
+    Genera una orden médica usando la Edge Function y la guarda localmente
+    en MEDIA_ROOT/ordenes/.
+    Retorna la instancia de Orden creada.
     """
-    print(f"📝 Generando orden para {tipo_estudio}...")
-    # 1️⃣ Preparar payload para la función edge
+
+    print(f"📝 Generando orden local para {tipo_estudio}...")
+
+    # ------------------------------------
+    # 1️⃣ Preparar payload para Edge Function
+    # ------------------------------------
     payload = {
         "tipo_estudio": tipo_estudio,
         "medico": {
@@ -46,50 +47,67 @@ def generar_orden_y_guardar(consulta, tipo_estudio, determinaciones, medico, pac
         "determinaciones": [{"nombre": d} for d in determinaciones],
     }
 
-    # 2️⃣ Preparar firma (si existe)
     files = {
         "payload": (None, json.dumps(payload), "application/json"),
     }
 
-    firma_bytes = None
     if getattr(medico, "firma_medico", None):
         try:
             with open(medico.firma_medico.path, "rb") as f:
-                firma_bytes = f.read()
-            files["firma_medico"] = ("firma.png", BytesIO(firma_bytes), "image/png")
+                files["firma_medico"] = ("firma.png", f.read(), "image/png")
         except Exception as e:
             print("⚠️ No se pudo leer la firma:", e)
 
-    headers = {"Authorization": f"Bearer {SUPABASE_KEY}"}
+    # ------------------------------------
+    # 2️⃣ Ejecutar Edge Function → devuelve PDF real
+    # ------------------------------------
+    res = requests.post(SUPABASE_FUNCTION_URL, files=files)
 
-    # 3️⃣ Llamar a la Edge Function
-    res = requests.post(SUPABASE_FUNCTION_URL, headers=headers, files=files)
     if res.status_code != 200:
-        print(f"⚠️ Error generando PDF ({res.status_code}): {res.text}")
+        print("⚠️ Error generando PDF:", res.text)
         return None
 
     pdf_bytes = res.content
 
-    # 4️⃣ Subir PDF al bucket
-    bucket = supabase.storage.from_(BUCKET)
-    tipo_estudio_clean = clean_filename(tipo_estudio)
+    # Validar PDF
+    if not pdf_bytes.startswith(b"%PDF"):
+        print("❌ ERROR: La Edge Function devolvió un archivo NO PDF")
+        return None
+
+    # ------------------------------------
+    # 3️⃣ Guardar localmente en /media/ordenes/
+    # ------------------------------------
+    ordenes_dir = os.path.join(settings.MEDIA_ROOT, "ordenes")
+    os.makedirs(ordenes_dir, exist_ok=True)
+
+    fs = FileSystemStorage(location=ordenes_dir)
+
+    tipo_clean = clean_filename(tipo_estudio)
     acomp_clean = clean_filename(str(acompañante))
-    file_name = f"acompanante_{acomp_clean}_paciente_{paciente.id}_orden_{consulta.id}_{tipo_estudio_clean}.pdf"
 
-    bucket.upload(
-        path=file_name,
-        file=pdf_bytes,
-        file_options={"content_type": "application/pdf", "x-upsert": "true"},
-    )
+    filename = f"orden_{consulta.id}_{tipo_clean}_pac_{paciente.id}_ac_{acomp_clean}.pdf"
 
-    pdf_url = bucket.get_public_url(file_name)
+    # Guardar PDF usando ContentFile (acepta bytes crudos)
+    fs.save(filename, ContentFile(pdf_bytes))
 
-    # 5️⃣ Guardar la orden en la BD
+    # ------------------------------------
+    # 4️⃣ Crear URL ABSOLUTA (http://localhost:8000/media/ordenes/archivo.pdf)
+    # ------------------------------------
+    # Si no lo tenés en settings, agregalo:
+    # SITE_URL = "http://localhost:8000"
+    site_url = getattr(settings, "SITE_URL", "http://localhost:8000")
+
+    file_url = f"{site_url}{settings.MEDIA_URL}ordenes/{filename}"
+
+    # ------------------------------------
+    # 5️⃣ Guardar registro en la base de datos
+    # ------------------------------------
     orden = Orden.objects.create(
         primera_consulta=consulta,
         tipo_estudio=tipo_estudio,
-        pdf_url=pdf_url,
+        pdf_url=file_url,
     )
 
-    print(f"✅ Orden creada correctamente ({tipo_estudio}): {pdf_url}")
+    print(f"✅ Orden guardada localmente en: {file_url}")
+
     return orden

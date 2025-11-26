@@ -1,6 +1,6 @@
 from rest_framework import viewsets, permissions
 from .models import Transferencia
-from .serializers import TransferenciaSerializer, EmbrionSimpleSerializer
+from .serializers import TransferenciaSerializer, EmbrionSimpleSerializer, TransferenciaReadSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from Embrion.models import Embrion
@@ -33,3 +33,53 @@ class TransferenciaViewSet(viewsets.ModelViewSet):
         embriones = Embrion.objects.filter(fertilizacion__ovocito__paciente=paciente)
         serializer = EmbrionSimpleSerializer(embriones, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='bulk_create')
+    def bulk_create(self, request):
+        """Accepts payload: {"tratamiento": <id>, "embriones": [{"embrion": id, "estado": ..., ...}, ...]}
+        Creates multiple Transferencia rows (one per embryo) in a transaction and returns them.
+        """
+        tratamiento_id = request.data.get('tratamiento')
+        embriones_payload = request.data.get('embriones', [])
+        if not tratamiento_id or not isinstance(embriones_payload, list) or len(embriones_payload) == 0:
+            return Response({'detail': 'tratamiento and embriones (non-empty list) are required.'}, status=400)
+
+        try:
+            tratamiento = Tratamiento.objects.get(pk=tratamiento_id)
+        except Tratamiento.DoesNotExist:
+            return Response({'detail': 'Tratamiento no encontrado.'}, status=404)
+
+        # Permitido: el owner del tratamiento, personal o médicos (se pueden añadir checks)
+        user = request.user
+
+        # Delegate creation to the serializer which will create one Transferencia and N TransferenciaEmbrion
+        data = request.data.copy()
+        serializer = TransferenciaSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        transferencia = serializer.save()
+
+        out = TransferenciaReadSerializer(transferencia)
+        return Response(out.data, status=201)
+
+    @action(detail=False, methods=['get'], url_path=r'transferencias-por-tratamiento/(?P<tratamiento_id>\d+)')
+    def transferencias_por_tratamiento(self, request, tratamiento_id=None):
+        """
+        Devuelve todas las transferencias asociadas a un tratamiento específico.
+        GET /api/transferencias/transferencias-por-tratamiento/{tratamiento_id}/
+        """
+        transferencias = self.get_queryset().filter(tratamiento_id=tratamiento_id)
+        serializer = TransferenciaReadSerializer(transferencias, many=True)
+        return Response({
+            "success": True,
+            "count": transferencias.count(),
+            "data": serializer.data
+        }, status=200)
+
+    @action(detail=False, methods=['get'], url_path=r'existe-transferencia/(?P<paciente_id>\d+)')
+    def existe_transferencia(self, request, paciente_id=None):
+        """
+        Devuelve si existe alguna transferencia para el paciente dado.
+        GET /api/transferencias/existe-transferencia/{paciente_id}/
+        """
+        existe = Transferencia.objects.filter(tratamiento__paciente_id=paciente_id).exists()
+        return Response({'existe_transferencia': existe})

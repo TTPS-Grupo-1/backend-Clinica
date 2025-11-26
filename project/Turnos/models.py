@@ -28,6 +28,7 @@ class Turno(models.Model):
     cancelado = models.BooleanField(default=False, help_text="Indica si el turno fue cancelado por el paciente o la clínica.")
     atendido = models.BooleanField(default=False, help_text="Indica si el turno ya fue completado y atendido por el médico.")
     id_externo = models.IntegerField(unique=True, help_text="ID único del turno en la API externa (Supabase).")
+    es_monitoreo = models.BooleanField(default=False, help_text="Indica si el turno corresponde a un monitoreo.")
 
     class Meta:
         db_table = 'turno'

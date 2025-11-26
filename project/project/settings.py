@@ -56,7 +56,6 @@ INSTALLED_APPS = [
     'Ovocito',
     'Medicos',
     'Puncion',
-    'Embrion',
     'PrimerConsulta',
     'AntecedentesGinecologicos',
     'AntecedentesPersonales',
@@ -74,6 +73,9 @@ INSTALLED_APPS = [
     'Transferencia',
     'Historial_ovocito',
     'seed_data',  # ✅ Agregar al final
+    'Embrion.apps.EmbrionConfig',  # ✅ Usar la clase Config, no solo 'Embrion'
+    'Historial_embrion',
+    'Seguimiento',
 ]
 
 AUTH_USER_MODEL = 'CustomUser.CustomUser'

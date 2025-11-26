@@ -1,7 +1,6 @@
 from django.db import models
 from CustomUser.models import CustomUser
 from PrimerConsulta.models import PrimeraConsulta
-from Transferencia.models import Transferencia
 from Puncion.models import Puncion
 from Turnos.models import Turno
 class Tratamiento(models.Model):
@@ -59,7 +58,7 @@ class Tratamiento(models.Model):
         help_text="Segunda consulta asociada al tratamiento"
     )
     transferencia = models.OneToOneField(
-        Transferencia,
+        'Transferencia.Transferencia',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -81,6 +80,12 @@ class Tratamiento(models.Model):
         related_name='tratamientos',
         help_text="Turnos asociados a este tratamiento"
     )
+    
+    id_pago = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="ID del pago asociado al tratamiento"
+    )
 
     class Meta:
         verbose_name = "Tratamiento"
@@ -88,4 +93,59 @@ class Tratamiento(models.Model):
         ordering = ['-fecha_creacion']
 
     def __str__(self):
-        return f"{self.nombre} - {self.paciente.get_full_name() or self.paciente.username}"
+        # `nombre` no existe en este modelo; usar id y paciente para evitar AttributeError
+        return f"Tratamiento #{self.id} - {self.paciente.get_full_name() or self.paciente.username}"
+    
+    @property
+    def estado_actual(self):
+        """
+        Calcula y devuelve el estado actual del tratamiento basándose en los datos relacionados.
+        Replica la lógica del frontend getEstadoTexto pero del lado del servidor.
+        """
+        # Si el tratamiento no está activo, está finalizado
+        if not self.activo:
+            return 'Finalizado'
+        
+        # Verificar si tiene seguimiento y está finalizado
+        if hasattr(self, 'seguimiento_beta') and self.seguimiento_beta:
+            return 'Finalizado'
+        
+        # Verificar si tiene transferencia
+        if self.transferencia:
+            return 'Transferencia'
+        
+        # Verificar si tiene fertilizaciones a través de la punción
+        if self.puncion:
+            # Importar aquí para evitar circular imports
+            from Fertilizacion.models import Fertilizacion
+            fertilizaciones = Fertilizacion.objects.filter(
+                ovocito__puncion=self.puncion
+            )
+            if fertilizaciones.exists():
+                return 'Fertilización'
+        
+        # Verificar si tiene punción
+        if self.puncion:
+            return 'Punción'
+        
+        # Verificar si tiene monitoreos
+        monitoreos = self.lista_monitoreos.all()
+        if monitoreos.exists():
+            # Verificar si todos los monitoreos están atendidos/finalizados
+            monitoreos_pendientes = monitoreos.filter(atendido=False)
+            if monitoreos_pendientes.exists():
+                return 'Monitoreos'
+            else:
+                # Todos los monitoreos están finalizados
+                return 'Monitoreos finalizados'
+        
+        # Verificar si tiene segunda consulta
+        if self.segunda_consulta:
+            return 'Segunda consulta'
+        
+        # Verificar si tiene primera consulta
+        if self.primera_consulta:
+            return 'Primera consulta'
+        
+        # Estado por defecto si acaba de ser creado
+        return 'En proceso'

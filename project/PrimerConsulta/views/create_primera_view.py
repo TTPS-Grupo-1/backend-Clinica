@@ -16,7 +16,7 @@ import logging
 from Orden.orden_email_service import enviar_ordenes_por_email
 from .generar_orden_pago import registrar_orden_pago
 from CustomUser.models import CustomUser
-
+import requests
 
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,9 @@ class CreatePrimeraConsultaMixin:
     """
 
     def create(self, request, *args, **kwargs):
+        
+        
+        
         payload = request.data
         print("Payload recibido:", payload)
         # Helper to safely convert numeric-like strings to int or None
@@ -73,6 +76,37 @@ class CreatePrimeraConsultaMixin:
         )
         
         print("paciente_id:", paciente_id)
+        url = f"http://127.0.0.1:8000/api/tratamientos/por-paciente/{paciente_id}/"
+
+        resp = requests.get(url)
+        
+        if resp.status_code != 404:
+            return Response(
+                {
+                    "success": False,
+                    "message": "El paciente ya tiene un tratamiento activo. No se puede iniciar un nuevo tratamiento.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        SUPABASE_DEUDA_PACIENTE = "https://ueozxvwsckonkqypfasa.supabase.co/functions/v1/deuda-paciente"
+        GRUPO = 1
+        deuda_resp = requests.post(
+                SUPABASE_DEUDA_PACIENTE,
+                json={"id_paciente": paciente_id, "numero_grupo": GRUPO},
+                timeout=10
+            )
+        deuda = deuda_resp.json().get("deuda_total")
+        if deuda and deuda > 0:
+            return Response(
+                {
+                    "success": False,
+                    "message": "El paciente tiene una deuda pendiente. No se puede iniciar un nuevo tratamiento.",
+                    "deuda": deuda
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
         print("medico_id:", medico_id)
 
 
@@ -312,7 +346,7 @@ class CreatePrimeraConsultaMixin:
                 medico = CustomUser.objects.get(id=medico_id)
                
                 # Crear el tratamiento vinculado a esta primera consulta
-                Tratamiento.objects.create(
+                tratamiento = Tratamiento.objects.create(
                     paciente=paciente,
                     medico=medico,
                     primera_consulta=consulta,
@@ -446,9 +480,11 @@ class CreatePrimeraConsultaMixin:
                 print("Datos de la orden de pago:")
                 print("Grupo:", 1)
                 print("ID Paciente:", paciente.id)
-                print("Monto:", 10000.0)
-                registrar_orden_pago(paciente.id, paciente.obra_social, 1, 10000.0)
-                
+                print("Monto:", 1000000)
+                pago = registrar_orden_pago(paciente.id, paciente.obra_social, 1, 1000000)
+                id_pago = pago.get("pago", {}).get("id")
+                tratamiento.id_pago = id_pago
+                tratamiento.save()
 
 
 

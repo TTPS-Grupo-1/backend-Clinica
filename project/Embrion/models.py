@@ -16,7 +16,7 @@ class Embrion(models.Model):
 
 	
 	calidad = models.IntegerField(choices=[(i, str(i)) for i in range(1, 6)], help_text="Calidad del embrión (1-5)", blank=True, null=True)
-	estado = models.CharField(max_length=20, choices=[("transferido", "Transferido"),("no transferido", "No Transferido"),("criopreservado", "Criopreservado"), ("descartado", "Descartado"), ("fresco", "Fresco")], help_text="Estado del embrión")
+	estado = models.CharField(max_length=20, default="Fresco", help_text="Estado del embrión")
 	fecha_modificacion = models.DateTimeField(auto_now=True, help_text="Fecha de última modificación")
 	pgt = models.CharField(max_length=20, choices=[("exitoso", "Exitoso"), ("no exitoso", "No Exitoso")], default="no realizado", help_text="Resultado del PGT", blank=True, null=True)
 	observaciones = models.TextField(blank=True, null=True, help_text="Observaciones adicionales sobre el embrión")

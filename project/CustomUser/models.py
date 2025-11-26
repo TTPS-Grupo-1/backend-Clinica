@@ -69,6 +69,10 @@ class CustomUser(AbstractUser):
     )
 
     eliminado = models.BooleanField(default=False)
+    
+    is_director = models.BooleanField(
+        default=False,
+    )
 
     # ---------------------------------------------------------
     # CAMPOS OPCIONALES SEGÚN ROL

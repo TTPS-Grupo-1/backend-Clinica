@@ -6,6 +6,7 @@ from ..models import Fertilizacion
 from ..serializers import FertilizacionSerializer
 from Tratamiento.models import Tratamiento
 from Fenotipo.models import Fenotipo
+from django.db import transaction, IntegrityError
 import logging
 import requests
 
@@ -99,7 +100,8 @@ class FertilizacionViewSet(viewsets.ModelViewSet):
 		"""
 		Endpoint para buscar semen compatible en el banco externo
 		"""
-		fenotipo_data = request.data.get('fenotipo')
+		# El frontend envía los campos del fenotipo directamente
+		fenotipo_data = request.data
 		
 		if not fenotipo_data:
 			return Response(
@@ -108,42 +110,58 @@ class FertilizacionViewSet(viewsets.ModelViewSet):
 			)
 		
 		try:
-			# URL de la API externa del banco de semen (ajustar según la API real)
-			banco_api_url = "https://api-banco-semen.ejemplo.com/buscar-compatibles"
+			# Usar el proxy local para consultar la API de Supabase
+			proxy_url = "http://localhost:8000/api/gametos/"
 			
-			# Preparar datos para la API externa
+			# Preparar datos según el formato requerido por la API
 			payload = {
-				'color_ojos': fenotipo_data.get('color_ojos'),
-				'color_pelo': fenotipo_data.get('color_pelo'),
-				'tipo_pelo': fenotipo_data.get('tipo_pelo'),
-				'altura_cm': fenotipo_data.get('altura_cm'),
-				'complexion_corporal': fenotipo_data.get('complexion_corporal'),
-				'rasgos_etnicos': fenotipo_data.get('rasgos_etnicos'),
-			}
-			
-			# Por ahora, simulamos la respuesta ya que no tenemos la API real
-			# En producción, descomenta las siguientes líneas:
-			# response = requests.post(banco_api_url, json=payload, timeout=10)
-			# response.raise_for_status()
-			# resultados = response.json()
-			
-			# Respuesta simulada para desarrollo
-			resultados = [
-				{
-					'id': 1,
-					'identificador': 'SEM-001',
-					'compatibilidad': 95,
-					'color_ojos': fenotipo_data.get('color_ojos', 'marrón'),
-					'color_pelo': fenotipo_data.get('color_pelo', 'castaño'),
-				},
-				{
-					'id': 2,
-					'identificador': 'SEM-002',
-					'compatibilidad': 87,
-					'color_ojos': fenotipo_data.get('color_ojos', 'marrón'),
-					'color_pelo': fenotipo_data.get('color_pelo', 'negro'),
+				"type": "esperma",
+				"phenotype": {
+					"eye_color": fenotipo_data.get('color_ojos', ''),
+					"hair_color": fenotipo_data.get('color_pelo', ''),
+					"hair_type": fenotipo_data.get('tipo_pelo', ''),
+					"height": fenotipo_data.get('altura_cm', 170),
+					"complexion": fenotipo_data.get('complexion_corporal', ''),
+					"ethnicity": fenotipo_data.get('rasgos_etnicos', '')
 				}
-			]
+			}
+			logger.info(f"Payload para proxy gametos: {payload}")
+			response = requests.post(proxy_url, json=payload, timeout=20)
+			response.raise_for_status()
+
+			resultados_api = response.json()
+
+			
+			# Procesar la respuesta de la API
+			logger.info("Iniciando procesamiento de resultados...")
+			resultados = []
+			
+			# La API devuelve un objeto con success, gamete, similarity
+			if resultados_api.get('success') and resultados_api.get('gamete'):
+				gamete = resultados_api.get('gamete', {})
+				phenotypes = gamete.get('phenotypes', {})
+				
+				# Convertir id a string para evitar errores de subscript
+				gamete_id = str(gamete.get('id', ''))
+				
+				# Manejar similarity de forma segura
+				similarity = resultados_api.get('similarity', 0)
+				if isinstance(similarity, (int, float)):
+					compatibilidad = int(similarity * 100)
+				else:
+					compatibilidad = 0
+				
+				resultados.append({
+					'id': gamete.get('id'),
+					'identificador': f"SEM-DON-{gamete_id[:8]}",
+					'compatibilidad': compatibilidad,
+					'color_ojos': phenotypes.get('eye_color', ''),
+					'color_pelo': phenotypes.get('hair_color', ''),
+					'edad_donante': 30,  # No está en la API, usar valor por defecto
+					'disponibilidad': 'alta'  # Asumimos alta si fue encontrado
+				})
+			else:
+				logger.warning(f"No se encontró gameto compatible o respuesta errónea: {resultados_api}")
 			
 			return Response({
 				'resultados': resultados
@@ -162,11 +180,142 @@ class FertilizacionViewSet(viewsets.ModelViewSet):
 				status=status.HTTP_500_INTERNAL_SERVER_ERROR
 			)
 
-	def create(self, request, *args, **kwargs):
-		serializer = self.get_serializer(data=request.data)
+	@action(detail=False, methods=['post'], url_path='buscar-banco-ovocitos')
+	def buscar_banco_ovocitos(self, request):
+		"""
+		Endpoint para buscar ovocitos donados compatibles usando Supabase
+		"""
+		# El frontend envía los campos del fenotipo directamente
+		fenotipo_data = request.data
+		
+		if not fenotipo_data:
+			return Response(
+				{"error": "Datos de fenotipo requeridos"}, 
+				status=status.HTTP_400_BAD_REQUEST
+			)
+		
+		try:
+			
+			# Usar el proxy local para consultar la API de Supabase
+			proxy_url = "http://localhost:8000/api/gametos/"
+			
+			# Preparar datos según el formato requerido por la API
+			payload = {
+				"type": "ovocito",  # La API usa "esperma" para ovocitos también
+				"phenotype": {
+					"eye_color": fenotipo_data.get('color_ojos', ''),
+					"hair_color": fenotipo_data.get('color_pelo', ''),
+					"hair_type": fenotipo_data.get('tipo_pelo', ''),
+					"height": fenotipo_data.get('altura_cm', 170),
+					"complexion": fenotipo_data.get('complexion_corporal', ''),
+					"ethnicity": fenotipo_data.get('rasgos_etnicos', '')
+				}
+			}
+			logger.info(f"Payload para proxy gametos (ovocitos): {payload}")
+			
+			# Realizar la petición al proxy local
+			response = requests.post(proxy_url, json=payload, timeout=20)
+			response.raise_for_status()
+			resultados_api = response.json()
+			
+			# Procesar la respuesta de la API
+			resultados = []
+			
+			# La API devuelve un objeto con success, gamete, similarity
+			if resultados_api.get('success') and resultados_api.get('gamete'):
+				gamete = resultados_api.get('gamete', {})
+				phenotypes = gamete.get('phenotypes', {})
+				
+				# Convertir id a string para evitar errores de subscript
+				gamete_id = str(gamete.get('id', ''))
+				
+				# Manejar similarity de forma segura
+				similarity = resultados_api.get('similarity', 0)
+				if isinstance(similarity, (int, float)):
+					compatibilidad = int(similarity * 100)
+				else:
+					compatibilidad = 0
+				
+				resultados.append({
+					'id': gamete.get('id'),
+					'identificador': f"OVO-DON-{gamete_id[:8]}",
+					'compatibilidad': compatibilidad,
+					'color_ojos': phenotypes.get('eye_color', ''),
+					'color_pelo': phenotypes.get('hair_color', ''),
+					'edad_donante': 25,  # No está en la API, usar valor por defecto
+					'cantidad_disponible': 5,  # Asumimos disponibilidad
+					'estado': 'criopreservado'  # Estado por defecto
+				})
+			else:
+				logger.warning(f"No se encontró ovocito compatible o respuesta errónea: {resultados_api}")
+			
+			return Response({
+				'resultados': resultados
+			})
+			
+		except requests.RequestException as e:
+			logger.error(f"Error consultando banco de ovocitos: {str(e)}")
+			return Response(
+				{"error": "Error consultando banco de ovocitos externo"}, 
+				status=status.HTTP_503_SERVICE_UNAVAILABLE
+			)
+		except Exception as e:
+			logger.error(f"Error inesperado en banco ovocitos: {str(e)}")
+			return Response(
+				{"error": "Error interno del servidor"}, 
+				status=status.HTTP_500_INTERNAL_SERVER_ERROR
+			)
+
+	def create(self, request):
+		serializer = FertilizacionSerializer(data=request.data)
+		print("Creando fertilización desde ViewSet...")
+
+		# Validación inicial
 		if not serializer.is_valid():
 			logger.warning(f"Errores de validación Fertilización: {serializer.errors}")
-		serializer.is_valid(raise_exception=True)
-		self.perform_create(serializer)
-		headers = self.get_success_headers(serializer.data)
-		return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+			return Response({
+				"success": False,
+				"message": "Hay errores en los campos de la fertilización.",
+				"errors": serializer.errors
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+		try:
+			with transaction.atomic():
+				# Guardar la fertilización
+				fertilizacion = serializer.save()
+				
+				# ✅ Asegurar que el id existe
+				fertilizacion.refresh_from_db()
+				
+				# Marcar ovocito como usado
+				ovocito = fertilizacion.ovocito
+				ovocito.usado = True
+				ovocito.save(update_fields=["usado"])
+				logger.info(f"Ovocito {ovocito.id_ovocito} marcado como usado")
+
+				# Construir respuesta final
+				result = {
+					"success": True,
+					"message": "Fertilización registrada correctamente.",
+					"id": fertilizacion.id_fertilizacion,  # ✅ Agregar el id en el nivel raíz
+					"data": FertilizacionSerializer(fertilizacion).data,
+					"embryo": None
+				}
+				
+				
+
+				return Response(result, status=status.HTTP_201_CREATED)
+
+		except IntegrityError as e:
+			logger.error(f"Error de integridad al crear fertilización: {str(e)}")
+			return Response({
+				"success": False,
+				"message": "Error de integridad al registrar la fertilización."
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+		except Exception as e:
+			logger.exception("Error inesperado al crear fertilización.")
+			return Response({
+				"success": False,
+				"message": f"Ocurrió un error al registrar la fertilización: {str(e)}"
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

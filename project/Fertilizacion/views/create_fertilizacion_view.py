@@ -31,6 +31,11 @@ class CreateFertilizacionMixin(APIView):
             with transaction.atomic():
                 fertilizacion = serializer.save()
                 logger.info(f"Fertilización creada: {fertilizacion}")
+                ovocito = fertilizacion.ovocito
+                ovocito.usado = True
+                ovocito.save(update_fields=["usado"])
+
+                logger.info(f"Ovocito {ovocito.id_ovocito} marcado como usado")
 
                 result = {
                     "success": True,
