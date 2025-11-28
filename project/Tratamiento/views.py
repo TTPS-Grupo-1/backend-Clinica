@@ -474,6 +474,89 @@ class TratamientoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @action(detail=False, methods=['post'], url_path='filtrar_estados', url_name='filtrar_estados')
+    def filtrar_pacientes_por_estados(self, request):
+        """
+        Filtra pacientes con tratamientos activos cuyo estado_actual coincide con cualquiera
+        de los estados provistos.
+
+        POST /api/tratamientos/filtrar_estados/
+
+        Body JSON:
+        {
+            "estados": ["Fertilización", "Punción", "Transferencia", "Finalizado"],
+            "pacientes_ids": [1, 2, 3, 4, 5]
+        }
+
+        Respuesta:
+        {
+            "estados_buscados": ["Fertilización", "Punción", "Transferencia", "Finalizado"],
+            "pacientes_que_cumplen": [
+                {"paciente_id": 2, "tratamiento_id": 15, "estado_actual": "Punción"}
+            ],
+            "total_encontrados": 1,
+            "total_revisados": 5
+        }
+        """
+        try:
+            estados_buscados = request.data.get('estados', None)
+            pacientes_ids = request.data.get('pacientes_ids', [])
+
+            if not isinstance(estados_buscados, list) or not estados_buscados:
+                return Response(
+                    {"error": "'estados' debe ser una lista no vacía de strings."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            estados_lista = [str(e).strip() for e in estados_buscados if str(e).strip()]
+            if not estados_lista:
+                return Response(
+                    {"error": "'estados' no contiene valores válidos."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if not isinstance(pacientes_ids, list) or not pacientes_ids:
+                return Response(
+                    {"error": "'pacientes_ids' debe ser una lista no vacía."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            try:
+                pacientes_ids = [int(x) for x in pacientes_ids]
+            except (ValueError, TypeError):
+                return Response(
+                    {"error": "'pacientes_ids' debe contener enteros válidos."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            tratamientos_activos = (
+                Tratamiento.objects
+                .select_related('paciente', 'medico', 'primera_consulta', 'segunda_consulta', 'puncion', 'transferencia')
+                .prefetch_related('lista_monitoreos')
+                .filter(paciente_id__in=pacientes_ids, activo=True)
+            )
+
+            pacientes_que_cumplen = []
+            for tratamiento in tratamientos_activos:
+                estado_actual = tratamiento.estado_actual
+                print(f"  📋 Paciente {tratamiento.paciente_id} - Tratamiento {tratamiento.id} - Estado: '{estado_actual}'")
+                if estado_actual in estados_lista:
+                    pacientes_que_cumplen.append({
+                        "paciente_id": tratamiento.paciente_id,
+                        "tratamiento_id": tratamiento.id,
+                        "estado_actual": estado_actual,
+                    })
+            return Response({
+                "estados_buscados": estados_lista,
+                "pacientes_que_cumplen": pacientes_que_cumplen,
+                "total_encontrados": len(pacientes_que_cumplen),
+                "total_revisados": len(pacientes_ids)
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error interno del servidor: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     @action(detail=False, methods=['get'], url_path=r'tiene-tratamientos-activos/(?P<medico_id>\d+)')
     def tiene_tratamientos_activos(self, request, medico_id=None):
         """

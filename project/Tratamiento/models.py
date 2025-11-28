@@ -102,50 +102,54 @@ class Tratamiento(models.Model):
         Calcula y devuelve el estado actual del tratamiento basándose en los datos relacionados.
         Replica la lógica del frontend getEstadoTexto pero del lado del servidor.
         """
-        # Si el tratamiento no está activo, está finalizado
+        # 1) Si el tratamiento no está activo, está finalizado
         if not self.activo:
             return 'Finalizado'
-        
-        # Verificar si tiene seguimiento y está finalizado
+
+        # 2) Si tiene algún seguimiento que indique finalización
         if hasattr(self, 'seguimiento_beta') and self.seguimiento_beta:
             return 'Finalizado'
-        
-        # Verificar si tiene transferencia
-        if self.transferencia:
+
+        # 3) Transferencia tiene prioridad sobre estados previos
+        if self.transferencia_id:
             return 'Transferencia'
-        
-        # Verificar si tiene fertilizaciones a través de la punción
-        if self.puncion:
-            # Importar aquí para evitar circular imports
+
+        # 4) Fertilización: detectar fertilizaciones vinculadas a la punción
+        #    o del paciente como fallback si no hay punción cargada
+        try:
             from Fertilizacion.models import Fertilizacion
-            fertilizaciones = Fertilizacion.objects.filter(
-                ovocito__puncion=self.puncion
-            )
+            if self.puncion_id:
+                fertilizaciones = Fertilizacion.objects.filter(ovocito__puncion_id=self.puncion_id)
+            else:
+                # Fallback: buscar fertilizaciones por paciente
+                fertilizaciones = Fertilizacion.objects.filter(ovocito__paciente_id=self.paciente_id)
             if fertilizaciones.exists():
                 return 'Fertilización'
-        
-        # Verificar si tiene punción
-        if self.puncion:
+        except Exception:
+            # Si hay algún error al importar/consultar, no bloquear el cálculo de estado
+            pass
+
+        # 5) Punción: si existe registro de punción, indicar ese estado
+        if self.puncion_id:
             return 'Punción'
-        
-        # Verificar si tiene monitoreos
-        monitoreos = self.lista_monitoreos.all()
-        if monitoreos.exists():
-            # Verificar si todos los monitoreos están atendidos/finalizados
-            monitoreos_pendientes = monitoreos.filter(atendido=False)
-            if monitoreos_pendientes.exists():
-                return 'Monitoreos'
-            else:
-                # Todos los monitoreos están finalizados
-                return 'Monitoreos finalizados'
-        
-        # Verificar si tiene segunda consulta
-        if self.segunda_consulta:
+
+        # 6) Monitoreos: si existen, revisar si están todos finalizados
+        try:
+            monitoreos = getattr(self, 'lista_monitoreos', None)
+            if monitoreos is not None:
+                qs = monitoreos.all()
+                if qs.exists():
+                    if qs.filter(atendido=False).exists():
+                        return 'Monitoreos'
+                    return 'Monitoreos finalizados'
+        except Exception:
+            pass
+
+        # 7) Consultas
+        if self.segunda_consulta_id:
             return 'Segunda consulta'
-        
-        # Verificar si tiene primera consulta
-        if self.primera_consulta:
+        if self.primera_consulta_id:
             return 'Primera consulta'
-        
-        # Estado por defecto si acaba de ser creado
+
+        # 8) Estado por defecto si acaba de ser creado
         return 'En proceso'
