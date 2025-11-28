@@ -349,27 +349,6 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(f'  ⚠️  {medico.first_name} {medico.last_name} (ya existía)')
             medicos.append(medico)
-            
-            
-        #Crear director medico 
-        director_medico, created = CustomUser.objects.get_or_create(
-            email='director.medico@clinica.com',
-            defaults={
-                'first_name': 'Director',
-                'last_name': 'Médico',
-                'dni': 32343424,
-                'telefono': '2214000001',
-                'rol': 'MEDICO',
-                'is_active': True,
-                'is_director': True,
-            }
-        )
-        if created:
-            director_medico.set_password('12345678')
-            director_medico.save()
-            self.stdout.write(f'  ✅ {director_medico.first_name} {director_medico.last_name}')
-        else:
-            self.stdout.write(f'  ⚠️  {director_medico.first_name} {director_medico.last_name} (ya existía)')
 
         # =====================================
         # 2. CREAR PACIENTES
@@ -968,7 +947,6 @@ class Command(BaseCommand):
         )
         admin_user.set_password('12345678')
         admin_user.save()
-        
 
         # ----------------
         # PACIENTE 1: Primera consulta completada (próximo: Segunda consulta)
@@ -1226,3 +1204,71 @@ class Command(BaseCommand):
             atendido=False,
         )
         self.stdout.write(f'    ✅ Monitoreo 3 (futuro - en 7 días)')
+
+        # ----------------
+        # PACIENTE 4: Con monitoreos finalizados (próximo: Punción)
+        # ----------------
+        paciente_fin, _ = CustomUser.objects.get_or_create(
+            email='paciente.finalizado@email.com',
+            defaults={
+                'first_name': 'Finola',
+                'last_name': 'Finalizada',
+                'dni': 47890123,
+                'telefono': '2215679004',
+                'rol': 'PACIENTE',
+                'is_active': True,
+            }
+        )
+        paciente_fin.set_password('12345678')
+        paciente_fin.save()
+        self.stdout.write(f'  ✅ Paciente 4: {paciente_fin.first_name} {paciente_fin.last_name} (Monitoreos finalizados)')
+
+        # Crear Primera Consulta
+        primera_consulta_fin = PrimeraConsulta.objects.create(
+            objetivo_consulta='Evaluación inicial para tratamiento de fertilidad',
+            antecedentes_clinicos_1={'diabetes': False, 'hipertension': False},
+            antecedentes_clinicos_2={'alergias': 'Ninguna', 'medicamentos': 'Ácido fólico'},
+            antecedentes_familiares_1='Sin antecedentes relevantes',
+            antecedentes_familiares_2='Sin antecedentes oncológicos',
+            antecedentes_genitales='Sin patología genital previa',
+            antecedentes_quirurgicos_1='Sin cirugías previas',
+            antecedentes_quirurgicos_2='Sin complicaciones',
+            examen_fisico_1='Paciente en buen estado general',
+            examen_fisico_2='Signos vitales normales'
+        )
+
+        # Crear Segunda Consulta
+        segunda_consulta_fin = SegundaConsulta.objects.create(
+            semen_viable=True,
+            ovocito_viable=True,
+        )
+
+        # Crear Tratamiento
+        tratamiento_fin = Tratamiento.objects.create(
+            paciente=paciente_fin,
+            medico=medico_extra,
+            objetivo='Embarazo gameto propio',
+            fecha_inicio=timezone.now().date() - timedelta(days=60),
+            activo=True,
+            primera_consulta=primera_consulta_fin,
+            segunda_consulta=segunda_consulta_fin,
+        )
+
+        # Crear 3 monitoreos completados
+        fechas_monitoreos = [
+            timezone.now() - timedelta(days=20),
+            timezone.now() - timedelta(days=15),
+            timezone.now() - timedelta(days=10),
+        ]
+        
+        for i, fecha_mon in enumerate(fechas_monitoreos, 1):
+            mon_fin = Monitoreo.objects.create(
+                tratamiento=tratamiento_fin,
+                fecha_atencion=fecha_mon,
+                descripcion=f'Monitoreo {i} completado. Evolución favorable. Parámetros dentro de rangos normales.',
+                atendido=True,
+                fecha_realizado=fecha_mon,
+            )
+            self.stdout.write(f'    ✅ Monitoreo {i} (completado hace {(timezone.now() - fecha_mon).days} días)')
+        
+        self.stdout.write(f'    🎯 Estado: Monitoreos finalizados - Lista para punción')
