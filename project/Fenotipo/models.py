@@ -9,7 +9,7 @@ class Fenotipo(models.Model):
 	"""
 	COMPLEXION_CHOICES = [
 		("delgada", "Delgada"),
-		("normal", "Normal"),
+		("media", "Normal"),
 		("robusta", "Robusta"),
 		("otra", "Otra"),
 	]
