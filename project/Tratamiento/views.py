@@ -25,7 +25,12 @@ from PrimerConsulta.models import PrimeraConsulta
 from PrimerConsulta.serializers import PrimeraConsultaSerializer
 from SegundaConsulta.models import SegundaConsulta
 from SegundaConsulta.serializers import SegundaConsultaSerializer
-
+from Ovocito.models import Ovocito
+from Embrion.models import Embrion
+from Fertilizacion.models import Fertilizacion
+from Historial_embrion.models import HistorialEmbrion
+from Historial_ovocito.models import HistorialOvocito 
+from django.utils import timezone
 
 class TratamientoViewSet(viewsets.ModelViewSet):
     """
@@ -303,37 +308,10 @@ class TratamientoViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     
-    @action(detail=True, methods=["patch"])
-    def cancelar(self, request, pk=None):
-        try:
-            tratamiento = self.get_object()
-            motivo = request.data.get("motivo_cancelacion", "").strip()
+    from django.utils import timezone
 
-            if not motivo:
-                return Response(
-                    {"error": "Debe proporcionar un motivo de cancelación."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
 
-            tratamiento.activo = False
-            tratamiento.motivo_finalizacion = motivo
-            tratamiento.save(update_fields=["activo", "motivo_finalizacion"])
-
-            return Response(
-                {"success": True, "message": "Tratamiento cancelado correctamente."},
-                status=status.HTTP_200_OK,
-            )
-
-        except Tratamiento.DoesNotExist:
-            return Response(
-                {"error": "Tratamiento no encontrado."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        except Exception as e:
-            return Response(
-                {"error": f"Error al cancelar el tratamiento: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+   
 
     @action(detail=False, methods=['get'], url_path=r'estado/(?P<paciente_id>\d+)')
     def estado_actual_trat_activos(self, request, paciente_id=None):
@@ -565,3 +543,109 @@ class TratamientoViewSet(viewsets.ModelViewSet):
         """
         existe = Tratamiento.objects.filter(medico_id=medico_id, activo=True).exists()
         return Response({'tiene_tratamientos_activos': existe})
+    
+    
+    
+    @action(detail=True, methods=["patch"])
+    def cancelar(self, request, pk=None):
+        try:
+            tratamiento = self.get_object()
+            motivo = request.data.get("motivo_cancelacion", "").strip()
+
+            if not motivo:
+                return Response(
+                    {"error": "Debe proporcionar un motivo de cancelación."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            paciente = tratamiento.paciente
+            usuario = request.user
+            ahora = timezone.now()
+
+            # ==========================================
+            # ⭐ 1. DESCARTAR OVOCITOS FRESCOS
+            # ==========================================
+            ovocitos_frescos = Ovocito.objects.filter(
+                paciente=paciente,
+                tipo_estado=Ovocito.ESTADO_FRESCO
+            )
+
+            ovocitos_list = list(ovocitos_frescos)
+
+            ovocitos_frescos.update(
+                tipo_estado=Ovocito.ESTADO_DESCARTADO
+            )
+
+            # ---- Historial de OVO ----
+            for ovocito in ovocitos_list:
+                HistorialOvocito.objects.create(
+                    ovocito=ovocito,
+                    paciente=paciente,
+                    estado="descartado",
+                    nota=f"Ovocito descartado automáticamente por cancelación del tratamiento #{tratamiento.id}.",
+                    usuario=usuario
+                )
+
+            # ==========================================
+            # ⭐ 2. DESCARTAR EMBRIONES FRESCOS
+            # ==========================================
+            ovocitos_paciente = Ovocito.objects.filter(paciente=paciente)
+            fertilizaciones = Fertilizacion.objects.filter(ovocito__in=ovocitos_paciente)
+
+            embriones_frescos = Embrion.objects.filter(
+                fertilizacion__in=fertilizaciones,
+                estado__iexact="fresco"
+            )
+
+            embriones_list = list(embriones_frescos)
+
+            embriones_frescos.update(
+                estado="descartado",
+                fecha_baja=ahora,
+                causa_descarte="Cancelación del tratamiento"
+            )
+
+            # ---- Historial de EMBRIÓN ----
+            for emb in embriones_list:
+                HistorialEmbrion.objects.create(
+                    embrion=emb,
+                    paciente=paciente,
+                    estado="descartado",
+                    calidad=str(emb.calidad) if emb.calidad else None,
+                    nota=f"Embrión descartado automáticamente por cancelación del tratamiento #{tratamiento.id}.",
+                    observaciones="Descarte automático del embrión",
+                    tipo_modificacion="cancelacion_tratamiento",
+                    usuario=usuario
+                )
+
+            # ==========================================
+            # ⭐ 3. CANCELAR TRATAMIENTO
+            # ==========================================
+            tratamiento.activo = False
+            tratamiento.motivo_finalizacion = motivo
+            tratamiento.save(update_fields=["activo", "motivo_finalizacion"])
+
+            # ==========================================
+            # ⭐ 4. RESPUESTA FINAL
+            # ==========================================
+            return Response(
+                {
+                    "success": True,
+                    "message": "Tratamiento cancelado y gametos descartados correctamente.",
+                    "ovocitos_descartados": len(ovocitos_list),
+                    "embriones_descartados": len(embriones_list),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Tratamiento.DoesNotExist:
+            return Response(
+                {"error": "Tratamiento no encontrado."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error al cancelar el tratamiento: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
