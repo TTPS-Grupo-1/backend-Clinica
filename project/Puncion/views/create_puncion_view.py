@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from django.db import IntegrityError, transaction
 from Ovocito.models import Ovocito
 from Ovocito.serializers import OvocitoSerializer
+from Historial_ovocito.models import HistorialOvocito  # ✅ Importar
 import logging
 import requests
 import json
@@ -30,7 +31,7 @@ class CreatePuncionMixin:
 
                 ovocitos_data = request.data.get("ovocitos", [])
                 ovocitos_creados = []
-                asignaciones = []  # ← para devolver todo al frontend
+                asignaciones = []
 
                 for ov_data in ovocitos_data:
                     ov_data["puncion"] = puncion.id
@@ -39,6 +40,16 @@ class CreatePuncionMixin:
                     if ov_serializer.is_valid():
                         ovocito = ov_serializer.save()
                         logger.info(f"Ovocito creado en punción: {ovocito.identificador}")
+
+                        # ✅ CREAR HISTORIAL INICIAL DEL OVOCITO
+                        HistorialOvocito.objects.create(
+                            ovocito=ovocito,
+                            paciente=ovocito.paciente,
+                            estado="fresco",
+                            nota=f"Ovocito creado en punción {puncion.id} - Estado inicial: {ovocito.tipo_estado}",
+                            usuario=request.user if request.user.is_authenticated else None
+                        )
+                        logger.info(f"✅ Historial inicial creado para ovocito {ovocito.identificador}")
 
                         # -----------------------------------------------
                         # 🔥 ASIGNACIÓN SUPABASE SI CRIOPRESERVADO
@@ -68,6 +79,16 @@ class CreatePuncionMixin:
                                         ovocito.rack_id = asign.get("rack_id")
                                         ovocito.save()
 
+                                        # ✅ CREAR HISTORIAL DE CRIOPRESERVACIÓN
+                                        HistorialOvocito.objects.create(
+                                            ovocito=ovocito,
+                                            paciente=ovocito.paciente,
+                                            estado=ovocito.tipo_estado,
+                                            nota=f"Ovocito criopreservado - Asignado a Tanque: {asign.get('tanque_id')}, Rack: {asign.get('rack_id')}",
+                                            usuario=request.user if request.user.is_authenticated else None
+                                        )
+                                        logger.info(f"✅ Historial de criopreservación creado para ovocito {ovocito.identificador}")
+
                                     else:
                                         asignaciones.append({"error": "Respuesta vacía de Supabase"})
                                 else:
@@ -76,9 +97,14 @@ class CreatePuncionMixin:
                             except Exception as e:
                                 logger.error(f"Error asignando ovocito en Supabase: {str(e)}")
                                 asignaciones.append({"error": "Error de conexión con Supabase"})
-
-                        # ------------------------------------------------
-
+                        elif ovocito.tipo_estado == "descartado":
+                            HistorialOvocito.objects.create(
+                            ovocito=ovocito,
+                            paciente=ovocito.paciente,
+                            estado="descartado",
+                            nota=f"Ovocito creado en punción {puncion.id} - Estado inicial: {ovocito.tipo_estado}",
+                            usuario=request.user if request.user.is_authenticated else None
+                             )
                         ovocitos_creados.append(ovocito)
 
                     else:
@@ -89,7 +115,7 @@ class CreatePuncionMixin:
                     "message": "Punción registrada correctamente.",
                     "data": serializer.data,
                     "ovocitos": [OvocitoSerializer(o).data for o in ovocitos_creados],
-                    "asignaciones": asignaciones  # → te devuelvo todas las asignaciones
+                    "asignaciones": asignaciones
                 }, status=status.HTTP_201_CREATED)
 
         except IntegrityError as e:

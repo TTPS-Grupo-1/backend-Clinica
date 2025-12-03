@@ -89,23 +89,23 @@ class CreatePrimeraConsultaMixin:
                 status=status.HTTP_400_BAD_REQUEST,
             )
         
-        SUPABASE_DEUDA_PACIENTE = "https://ueozxvwsckonkqypfasa.supabase.co/functions/v1/deuda-paciente"
-        GRUPO = 1
-        deuda_resp = requests.post(
-                SUPABASE_DEUDA_PACIENTE,
-                json={"id_paciente": paciente_id, "numero_grupo": GRUPO},
-                timeout=10
-            )
-        deuda = deuda_resp.json().get("deuda_total")
-        if deuda and deuda > 0:
-            return Response(
-                {
-                    "success": False,
-                    "message": "El paciente tiene una deuda pendiente. No se puede iniciar un nuevo tratamiento.",
-                    "deuda": deuda
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        #SUPABASE_DEUDA_PACIENTE = "https://ueozxvwsckonkqypfasa.supabase.co/functions/v1/deuda-paciente"
+        #GRUPO = 1
+        #deuda_resp = requests.post(
+        #        SUPABASE_DEUDA_PACIENTE,
+        #        json={"id_paciente": paciente_id, "numero_grupo": GRUPO},
+        #        timeout=10
+        #    )
+        #deuda = deuda_resp.json().get("deuda_total")
+        #if deuda and deuda > 0:
+        #    return Response(
+        #        {
+        #            "success": False,
+        #            "message": "El paciente tiene una deuda pendiente. No se puede iniciar un nuevo tratamiento.",
+        #            "deuda": deuda
+        #        },
+        #        status=status.HTTP_400_BAD_REQUEST,
+        #    )
         
         print("medico_id:", medico_id)
 
