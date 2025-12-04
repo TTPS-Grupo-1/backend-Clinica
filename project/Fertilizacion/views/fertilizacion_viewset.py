@@ -16,6 +16,26 @@ class FertilizacionViewSet(viewsets.ModelViewSet):
 	queryset = Fertilizacion.objects.all()
 	serializer_class = FertilizacionSerializer
 
+	def get_queryset(self):
+		"""
+		Filtrar fertilizaciones por paciente usando query parameters.
+		Ejemplo: /api/fertilizacion/?paciente=4
+		"""
+		queryset = Fertilizacion.objects.all()
+		paciente_id = self.request.query_params.get('paciente')
+		
+		if paciente_id:
+			try:
+				paciente_id = int(paciente_id)
+				# Filtrar a través de la relación ovocito -> paciente
+				queryset = queryset.filter(ovocito__paciente_id=paciente_id)
+				logger.info(f"Filtrando fertilizaciones por paciente {paciente_id}: {queryset.count()} encontradas")
+			except ValueError:
+				logger.warning(f"ID de paciente inválido en query params: {paciente_id}")
+				return Fertilizacion.objects.none()
+		
+		return queryset.order_by('-id_fertilizacion')
+
 	@action(detail=False, methods=['get'], url_path='tratamiento-info/(?P<paciente_id>[^/.]+)')
 	def tratamiento_info(self, request, paciente_id=None):
 		"""
@@ -66,12 +86,23 @@ class FertilizacionViewSet(viewsets.ModelViewSet):
 			objetivo_lower = tratamiento.objetivo.lower() if tratamiento.objetivo else ''
 			tipo_pareja = 'sin_pareja'  # default
 			
+			logger.info(f"🔍 Determinando tipo_pareja para paciente {paciente_id}")
+			logger.info(f"📋 Objetivo del tratamiento: '{tratamiento.objetivo}'")
+			logger.info(f"📋 Objetivo lowercase: '{objetivo_lower}'")
+			
 			if 'embarazo gameto propio' in objetivo_lower:
 				tipo_pareja = 'masculina'  # Pareja heterosexual con gametos propios
+				logger.info(f"✅ Detectado: Pareja MASCULINA (gametos propios)")
 			elif 'embarazo con pareja del mismo sexo' in objetivo_lower or 'ropa' in objetivo_lower:
 				tipo_pareja = 'femenina'  # Pareja femenina/lesbiana - necesita donante espermatozoide
+				logger.info(f"✅ Detectado: Pareja FEMENINA (ROPA o mismo sexo)")
 			elif 'mujer sin pareja' in objetivo_lower or 'donante de espermatozoide' in objetivo_lower:
 				tipo_pareja = 'sin_pareja'  # Mujer sola - necesita donante espermatozoide
+				logger.info(f"✅ Detectado: SIN PAREJA (donante necesario)")
+			else:
+				logger.warning(f"⚠️ No se pudo determinar tipo_pareja - usando default: {tipo_pareja}")
+			
+			logger.info(f"🎯 tipo_pareja FINAL: {tipo_pareja}")
 
 			return Response({
 				'tratamiento_id': tratamiento.id,
@@ -130,6 +161,7 @@ class FertilizacionViewSet(viewsets.ModelViewSet):
 			response.raise_for_status()
 
 			resultados_api = response.json()
+			logger.info(f"📊 Respuesta completa de la API de gametos (semen): {resultados_api}")
 
 			
 			# Procesar la respuesta de la API
@@ -140,6 +172,8 @@ class FertilizacionViewSet(viewsets.ModelViewSet):
 			if resultados_api.get('success') and resultados_api.get('gamete'):
 				gamete = resultados_api.get('gamete', {})
 				phenotypes = gamete.get('phenotypes', {})
+				
+				logger.info(f"✅ Gameto encontrado: ID={gamete.get('id')}, phenotypes={phenotypes}")
 				
 				# Convertir id a string para evitar errores de subscript
 				gamete_id = str(gamete.get('id', ''))
@@ -161,8 +195,10 @@ class FertilizacionViewSet(viewsets.ModelViewSet):
 					'disponibilidad': 'alta'  # Asumimos alta si fue encontrado
 				})
 			else:
-				logger.warning(f"No se encontró gameto compatible o respuesta errónea: {resultados_api}")
+				logger.warning(f"⚠️ No se encontró gameto compatible. Success: {resultados_api.get('success')}, tiene gamete: {bool(resultados_api.get('gamete'))}")
+				logger.warning(f"⚠️ Respuesta completa: {resultados_api}")
 			
+			logger.info(f"📦 Devolviendo {len(resultados)} resultados de semen")
 			return Response({
 				'resultados': resultados
 			})
@@ -268,7 +304,7 @@ class FertilizacionViewSet(viewsets.ModelViewSet):
 
 	def create(self, request):
 		serializer = FertilizacionSerializer(data=request.data)
-		print("Creando fertilización desde ViewSet...")
+		logger.info(f"🔧 Creando fertilización - datos recibidos: {request.data}")
 
 		# Validación inicial
 		if not serializer.is_valid():
@@ -287,23 +323,24 @@ class FertilizacionViewSet(viewsets.ModelViewSet):
 				# ✅ Asegurar que el id existe
 				fertilizacion.refresh_from_db()
 				
-				# Marcar ovocito como usado
-				ovocito = fertilizacion.ovocito
-				ovocito.usado = True
-				ovocito.save(update_fields=["usado"])
-				logger.info(f"Ovocito {ovocito.id_ovocito} marcado como usado")
+				# Marcar ovocito como usado SOLO si es ovocito local (no donado)
+				if fertilizacion.ovocito:
+					ovocito = fertilizacion.ovocito
+					ovocito.usado = True
+					ovocito.save(update_fields=["usado"])
+					logger.info(f"✅ Ovocito local {ovocito.id_ovocito} marcado como usado")
+				elif fertilizacion.ovocito_donado_id:
+					logger.info(f"🏦 Fertilización creada con ovocito donado: ID={fertilizacion.ovocito_donado_id}, info={fertilizacion.ovocito_donado_info}")
 
 				# Construir respuesta final
 				result = {
 					"success": True,
 					"message": "Fertilización registrada correctamente.",
-					"id": fertilizacion.id_fertilizacion,  # ✅ Agregar el id en el nivel raíz
+					"id": fertilizacion.id_fertilizacion,
 					"data": FertilizacionSerializer(fertilizacion).data,
 					"embryo": None
 				}
 				
-				
-
 				return Response(result, status=status.HTTP_201_CREATED)
 
 		except IntegrityError as e:

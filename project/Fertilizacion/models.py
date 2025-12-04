@@ -23,7 +23,22 @@ class Fertilizacion(models.Model):
 		'Ovocito.Ovocito',
 		on_delete=models.CASCADE,
 		related_name='fertilizaciones',
-		help_text='Ovocito sobre el que se realizó la fertilización'
+		null=True,  # ✅ Permitir NULL para ovocitos donados
+		blank=True,
+		help_text='Ovocito sobre el que se realizó la fertilización (NULL si es donado)'
+	)
+	
+	# Campo para ovocitos donados del banco externo
+	ovocito_donado_id = models.IntegerField(
+		null=True, 
+		blank=True, 
+		help_text='ID del ovocito donado del banco externo (Supabase)'
+	)
+	ovocito_donado_info = models.CharField(
+		max_length=150, 
+		null=True, 
+		blank=True, 
+		help_text='Identificador del ovocito donado (ej: OVO-DON-12345678)'
 	)
 
 	# Información del semen: campo libre y un posible id numérico si se integra otra tabla
