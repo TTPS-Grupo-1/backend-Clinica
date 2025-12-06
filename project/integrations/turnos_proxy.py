@@ -142,6 +142,8 @@ def turnos_proxy_reservar(request):
         id_paciente = body_data.get('id_paciente')
         id_turno = body_data.get('id_turno')
         
+        es_monitoreo_value = body_data.pop('es_monitoreo', False)
+
         if not id_paciente or not id_turno:
             return JsonResponse({"success": False, "error": "Faltan id_paciente o id_turno."}, status=400)
 
@@ -182,6 +184,7 @@ def turnos_proxy_reservar(request):
                         fecha_hora=fecha_hora_dt,
                         id_externo=id_turno_externo,
                         # No incluimos 'estado' ni 'id'/'created_at' porque son automáticos
+                        es_monitoreo=es_monitoreo_value,
                     )
                 
                 # Devolver respuesta exitosa DE LA API EXTERNA
