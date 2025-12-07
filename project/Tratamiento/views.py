@@ -141,44 +141,63 @@ class TratamientoViewSet(viewsets.ModelViewSet):
             # ==========================================
             # 1. OVOCITOS - Solo de la punción de este tratamiento
             # ==========================================
-            print(f"🔍 DEBUG: Obteniendo ovocitos del tratamiento {pk}...")
+            print(f"\n{'='*60}")
+            print(f"🔍 TRATAMIENTO #{pk} - Filtrando datos específicos")
+            print(f"{'='*60}")
+            print(f"📋 Tratamiento.puncion: {tratamiento.puncion}")
+            
             ovocitos_data = []
             ovocitos = []
             if tratamiento.puncion:
-                print(f"🔍 DEBUG: Tratamiento tiene punción: {tratamiento.puncion.id}")
+                print(f"✅ Tratamiento tiene punción ID: {tratamiento.puncion.id}")
                 ovocitos = Ovocito.objects.filter(puncion=tratamiento.puncion)
-                print(f"🔍 DEBUG: Encontrados {ovocitos.count()} ovocitos")
+                print(f"📊 Ovocitos encontrados: {ovocitos.count()}")
+                if ovocitos.exists():
+                    for ovo in ovocitos:
+                        print(f"   - Ovocito ID={ovo.id_ovocito}, identificador={ovo.identificador}, puncion_id={ovo.puncion_id}")
                 ovocitos_data = OvocitoSerializer(ovocitos, many=True).data
             else:
-                print(f"🔍 DEBUG: Tratamiento sin punción, no hay ovocitos")
+                print(f"❌ Tratamiento SIN punción asignada - No hay ovocitos para este tratamiento")
             
             # ==========================================
             # 2. FERTILIZACIONES - Solo de los ovocitos de esta punción
             # ==========================================
-            print(f"🔍 DEBUG: Obteniendo fertilizaciones del tratamiento {pk}...")
             fertilizaciones_data = []
             fertilizaciones = []
-            if ovocitos:
+            if ovocitos:  
                 ovocitos_ids = [o.id_ovocito for o in ovocitos]
-                print(f"🔍 DEBUG: Buscando fertilizaciones de ovocitos: {ovocitos_ids}")
+                print(f"\n📊 Buscando fertilizaciones de ovocitos IDs: {ovocitos_ids}")
                 fertilizaciones = Fertilizacion.objects.filter(ovocito__in=ovocitos_ids)
-                print(f"🔍 DEBUG: Encontradas {fertilizaciones.count()} fertilizaciones")
+                print(f"📊 Fertilizaciones encontradas: {fertilizaciones.count()}")
+                if fertilizaciones.exists():
+                    for fert in fertilizaciones:
+                        print(f"   - Fertilización ID={fert.id_fertilizacion}, ovocito_id={fert.ovocito_id}")
                 fertilizaciones_data = FertilizacionSerializer(fertilizaciones, many=True).data
             else:
-                print(f"🔍 DEBUG: Sin ovocitos, no hay fertilizaciones")
+                print(f"❌ Sin ovocitos - No hay fertilizaciones para este tratamiento")
 
             # ==========================================
             # 3. EMBRIONES - Solo de las fertilizaciones de este tratamiento
             # ==========================================
-            print(f"🔍 DEBUG: Obteniendo embriones del tratamiento {pk}...")
             embriones = []
-            for fert in fertilizaciones:
-                try:
-                    embriones.append(fert.embrion)
-                except Embrion.DoesNotExist:
-                    print(f"  ⚠️ Fertilización {fert.id} no tiene embrión")
+            if fertilizaciones:  
+                print(f"\n📊 Buscando embriones de las fertilizaciones...")
+                for fert in fertilizaciones:
+                    try:
+                        emb = fert.embrion
+                        embriones.append(emb)
+                        print(f"   - Embrión ID={emb.id}, identificador={emb.identificador}, fertilizacion_id={fert.id_fertilizacion}")
+                    except Embrion.DoesNotExist:
+                        print(f"   ⚠️ Fertilización {fert.id_fertilizacion} no tiene embrión asociado")
+            else:
+                print(f"❌ Sin fertilizaciones - No hay embriones para este tratamiento")
             
-            print(f"🔍 DEBUG: Encontrados {len(embriones)} embriones")
+            print(f"\n✅ RESUMEN:")
+            print(f"   Ovocitos: {len(ovocitos_data)}")
+            print(f"   Fertilizaciones: {len(fertilizaciones_data)}")
+            print(f"   Embriones: {len(embriones)}")
+            print(f"{'='*60}\n")
+            
             embriones_data = EmbrionSerializer(embriones, many=True).data
 
             # Obtener datos relacionados con primera consulta
