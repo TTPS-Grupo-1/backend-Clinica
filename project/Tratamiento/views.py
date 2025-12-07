@@ -139,42 +139,69 @@ class TratamientoViewSet(viewsets.ModelViewSet):
             print(f"🔍 DEBUG: Tratamiento serializado correctamente")
             
             # ==========================================
-            # 1. OVOCITOS - Solo de la punción de este tratamiento
+            # 1. OVOCITOS - De TODAS las punciones del paciente en este tratamiento
             # ==========================================
             print(f"\n{'='*60}")
             print(f"🔍 TRATAMIENTO #{pk} - Filtrando datos específicos")
             print(f"{'='*60}")
-            print(f"📋 Tratamiento.puncion: {tratamiento.puncion}")
             
-            ovocitos_data = []
-            ovocitos = []
+            # Obtener todas las punciones del paciente
+            from Puncion.models import Puncion
+            punciones_paciente = Puncion.objects.filter(paciente=tratamiento.paciente)
+            print(f"📊 Total de punciones del paciente: {punciones_paciente.count()}")
+            
+            # Si el tratamiento tiene punción OneToOne, priorizar esa
+            # Sino, usar todas las punciones del paciente durante el tratamiento
             if tratamiento.puncion:
-                print(f"✅ Tratamiento tiene punción ID: {tratamiento.puncion.id}")
-                ovocitos = Ovocito.objects.filter(puncion=tratamiento.puncion)
-                print(f"📊 Ovocitos encontrados: {ovocitos.count()}")
-                if ovocitos.exists():
-                    for ovo in ovocitos:
-                        print(f"   - Ovocito ID={ovo.id_ovocito}, identificador={ovo.identificador}, puncion_id={ovo.puncion_id}")
-                ovocitos_data = OvocitoSerializer(ovocitos, many=True).data
+                print(f"✅ Tratamiento tiene punción OneToOne ID: {tratamiento.puncion.id}")
+                punciones = [tratamiento.puncion]
             else:
-                print(f"❌ Tratamiento SIN punción asignada - No hay ovocitos para este tratamiento")
+                # Filtrar punciones por fecha del tratamiento
+                punciones = punciones_paciente.filter(
+                    fecha__gte=tratamiento.fecha_inicio
+                )
+                print(f"📊 Punciones durante el tratamiento (desde {tratamiento.fecha_inicio}): {punciones.count()}")
+            
+            # Recolectar ovocitos de TODAS las punciones
+            ovocitos = []
+            for puncion in punciones:
+                ovocitos_puncion = list(Ovocito.objects.filter(puncion=puncion))
+                print(f"   📌 Punción ID={puncion.id} ({puncion.fecha}): {len(ovocitos_puncion)} ovocitos")
+                ovocitos.extend(ovocitos_puncion)
+            
+            print(f"📊 Total ovocitos de todas las punciones: {len(ovocitos)}")
+            if ovocitos:
+                for ovo in ovocitos[:5]:  # Mostrar solo los primeros 5
+                    print(f"   - Ovocito ID={ovo.id_ovocito}, identificador={ovo.identificador}, puncion_id={ovo.puncion_id}")
+            
+            ovocitos_data = OvocitoSerializer(ovocitos, many=True).data
             
             # ==========================================
-            # 2. FERTILIZACIONES - Solo de los ovocitos de esta punción
+            # 2. FERTILIZACIONES - De los ovocitos del paciente en este tratamiento
             # ==========================================
             fertilizaciones_data = []
             fertilizaciones = []
+            
             if ovocitos:  
                 ovocitos_ids = [o.id_ovocito for o in ovocitos]
-                print(f"\n📊 Buscando fertilizaciones de ovocitos IDs: {ovocitos_ids}")
-                fertilizaciones = Fertilizacion.objects.filter(ovocito__in=ovocitos_ids)
+                print(f"\n📊 Buscando fertilizaciones de {len(ovocitos_ids)} ovocitos")
+                fertilizaciones = Fertilizacion.objects.filter(ovocito_id__in=ovocitos_ids)
                 print(f"📊 Fertilizaciones encontradas: {fertilizaciones.count()}")
                 if fertilizaciones.exists():
-                    for fert in fertilizaciones:
+                    for fert in fertilizaciones[:5]:  # Mostrar solo las primeras 5
                         print(f"   - Fertilización ID={fert.id_fertilizacion}, ovocito_id={fert.ovocito_id}")
                 fertilizaciones_data = FertilizacionSerializer(fertilizaciones, many=True).data
             else:
-                print(f"❌ Sin ovocitos - No hay fertilizaciones para este tratamiento")
+                # Fallback: buscar fertilizaciones del paciente durante el tratamiento
+                print(f"\n📊 Sin ovocitos específicos, buscando fertilizaciones del paciente...")
+                ovocitos_paciente = Ovocito.objects.filter(paciente=tratamiento.paciente)
+                if ovocitos_paciente.exists():
+                    fertilizaciones = Fertilizacion.objects.filter(
+                        ovocito__in=ovocitos_paciente,
+                        fecha_fertilizacion__gte=tratamiento.fecha_inicio
+                    )
+                    print(f"📊 Fertilizaciones del paciente desde {tratamiento.fecha_inicio}: {fertilizaciones.count()}")
+                    fertilizaciones_data = FertilizacionSerializer(fertilizaciones, many=True).data
 
             # ==========================================
             # 3. EMBRIONES - Solo de las fertilizaciones de este tratamiento
@@ -252,20 +279,99 @@ class TratamientoViewSet(viewsets.ModelViewSet):
             else:
                 print(f"🔍 DEBUG: Tratamiento sin segunda consulta")
 
+            # ==========================================
+            # 4. MONITOREOS - Del tratamiento
+            # ==========================================
+            print(f"\n📊 Buscando monitoreos del tratamiento...")
+            from Monitoreo.models import Monitoreo
+            from Monitoreo.serializers import MonitoreoSerializer
+            
+            monitoreos = Monitoreo.objects.filter(
+                tratamiento=tratamiento,
+                atendido=True
+            ).order_by('fecha_realizado')
+            print(f"📊 Monitoreos encontrados: {monitoreos.count()}")
+            monitoreos_data = MonitoreoSerializer(monitoreos, many=True).data
+            
+            # ==========================================
+            # ⚠️ VALIDACIÓN: Si no hay segunda consulta ni monitoreos, no buscar datos avanzados
+            # ==========================================
+            if not tratamiento.segunda_consulta or not monitoreos.exists():
+                print(f"⚠️ ADVERTENCIA: Tratamiento sin segunda consulta ni monitoreos")
+                print(f"⚠️ No se buscarán ovocitos, fertilizaciones, embriones, transferencias ni seguimiento")
+                
+                response_data = {
+                    'tratamiento': tratamiento_data,
+                    'ovocitos': [],
+                    'fertilizaciones': [],
+                    'embriones': [],
+                    'primera_consulta': primera_consulta_data,
+                    'segunda_consulta': segunda_consulta_data,
+                    'antecedentes_ginecologicos': antecedentes_ginecologicos_data,
+                    'antecedentes_personales': antecedentes_personales_data,
+                    'resultados_estudios': resultados_estudios_data,
+                    'ordenes': ordenes_data,
+                    'monitoreos': monitoreos_data,
+                    'transferencias': [],
+                    'tiene_seguimiento': False,
+                    'existe_puncion': False,
+                }
+                print(f"🔍 DEBUG: Respuesta preparada (sin datos avanzados), enviando...")
+                return Response(response_data, status=status.HTTP_200_OK)
+            
+            # ==========================================
+            # 5. TRANSFERENCIAS - Del tratamiento
+            # ==========================================
+            print(f"\n📊 Buscando transferencias del tratamiento...")
+            from Transferencia.models import Transferencia
+            from Transferencia.serializers import TransferenciaSerializer
+            
+            transferencias = Transferencia.objects.filter(tratamiento=tratamiento)
+            print(f"📊 Transferencias encontradas: {transferencias.count()}")
+            transferencias_data = TransferenciaSerializer(transferencias, many=True).data
+            
+            # ==========================================
+            # 6. SEGUIMIENTO - Del tratamiento
+            # ==========================================
+            print(f"\n📊 Verificando seguimiento del tratamiento...")
+            from Seguimiento.models import SeguimientoTratamiento
+            
+            tiene_seguimiento = SeguimientoTratamiento.objects.filter(tratamiento=tratamiento).exists()
+            print(f"📊 Tiene seguimiento: {tiene_seguimiento}")
+            
+            # ==========================================
+            # 7. PUNCIÓN - Verificar si existe
+            # ==========================================
+            existe_puncion = tratamiento.puncion is not None or punciones.exists()
+            print(f"📊 Existe punción: {existe_puncion}")
+
             print(f"🔍 DEBUG: Preparando respuesta final...")
             response_data = {
                 'tratamiento': tratamiento_data,
                 'ovocitos': ovocitos_data,
                 'fertilizaciones': fertilizaciones_data,
                 'embriones': embriones_data,
-                'primera_consulta': primera_consulta_data,  # 🔥 NUEVO: Datos completos de primera consulta
-                'segunda_consulta': segunda_consulta_data,  # 🔥 NUEVO: Datos completos de segunda consulta
+                'primera_consulta': primera_consulta_data,
+                'segunda_consulta': segunda_consulta_data,
                 'antecedentes_ginecologicos': antecedentes_ginecologicos_data,
                 'antecedentes_personales': antecedentes_personales_data,
                 'resultados_estudios': resultados_estudios_data,
-                'ordenes': ordenes_data
+                'ordenes': ordenes_data,
+                'monitoreos': monitoreos_data,  # 🔥 NUEVO
+                'transferencias': transferencias_data,  # 🔥 NUEVO
+                'tiene_seguimiento': tiene_seguimiento,  # 🔥 NUEVO
+                'existe_puncion': existe_puncion,  # 🔥 NUEVO
             }
             print(f"🔍 DEBUG: Respuesta preparada, enviando...")
+            print(f"\n✅ RESUMEN FINAL:")
+            print(f"   Ovocitos: {len(ovocitos_data)}")
+            print(f"   Fertilizaciones: {len(fertilizaciones_data)}")
+            print(f"   Embriones: {len(embriones_data)}")
+            print(f"   Monitoreos: {len(monitoreos_data)}")
+            print(f"   Transferencias: {len(transferencias_data)}")
+            print(f"   Seguimiento: {tiene_seguimiento}")
+            print(f"   Punción: {existe_puncion}")
+            print(f"{'='*60}\n")
             return Response(response_data, status=status.HTTP_200_OK)
 
         except Tratamiento.DoesNotExist:
