@@ -113,22 +113,5 @@ class TransferenciaSerializer(serializers.ModelSerializer):
                 embrion_obj._skip_historial = True
                 embrion_obj.save()
 
-                # 🔥 NUEVO: Marcar el ovocito asociado como transferido
-                if hasattr(embrion_obj, 'fertilizacion') and embrion_obj.fertilizacion and embrion_obj.fertilizacion.ovocito:
-                    ovocito_obj = embrion_obj.fertilizacion.ovocito
-                    
-                    # Registrar en historial_ovocito
-                    HistorialOvocito.objects.create(
-                        ovocito=ovocito_obj,
-                        paciente=transferencia.tratamiento.paciente,
-                        estado='transferido',
-                        nota=f"Ovocito transferido junto con embrión {embrion_obj.identificador}. {te_data.get('observaciones') or ''}",
-                        usuario=te_data.get('realizado_por') or validated_data.get('realizado_por')
-                    )
-                    
-                    # Marcar ovocito como transferido
-                    ovocito_obj.tipo_estado = 'transferido'
-                    ovocito_obj._skip_historial = True
-                    ovocito_obj.save()
 
         return transferencia

@@ -1272,3 +1272,151 @@ class Command(BaseCommand):
             self.stdout.write(f'    ✅ Monitoreo {i} (completado hace {(timezone.now() - fecha_mon).days} días)')
         
         self.stdout.write(f'    🎯 Estado: Monitoreos finalizados - Lista para punción')
+
+        # ----------------
+        # PACIENTE 5: En etapa de Transferencia (con embriones listos)
+        # ----------------
+        paciente_trans, _ = CustomUser.objects.get_or_create(
+            email='paciente.transferencia@email.com',
+            defaults={
+                'first_name': 'Teresa',
+                'last_name': 'Transferencia',
+                'dni': 48901234,
+                'telefono': '2215679005',
+                'rol': 'PACIENTE',
+                'is_active': True,
+            }
+        )
+        paciente_trans.set_password('12345678')
+        paciente_trans.save()
+        self.stdout.write(f'  ✅ Paciente 5: {paciente_trans.first_name} {paciente_trans.last_name} (En etapa de transferencia)')
+
+        # Crear Primera Consulta
+        primera_consulta_trans = PrimeraConsulta.objects.create(
+            objetivo_consulta='Evaluación inicial para tratamiento de fertilidad',
+            antecedentes_clinicos_1={'diabetes': False, 'hipertension': False},
+            antecedentes_clinicos_2={'alergias': 'Ninguna', 'medicamentos': 'Ácido fólico'},
+            antecedentes_familiares_1='Sin antecedentes relevantes',
+            antecedentes_familiares_2='Sin antecedentes oncológicos',
+            antecedentes_genitales='Sin patología genital previa',
+            antecedentes_quirurgicos_1='Sin cirugías previas',
+            antecedentes_quirurgicos_2='Sin complicaciones',
+            examen_fisico_1='Paciente en buen estado general',
+            examen_fisico_2='Signos vitales normales'
+        )
+
+        # Crear Segunda Consulta
+        segunda_consulta_trans = SegundaConsulta.objects.create(
+            semen_viable=True,
+            ovocito_viable=True,
+        )
+
+        # Crear Tratamiento
+        tratamiento_trans = Tratamiento.objects.create(
+            paciente=paciente_trans,
+            medico=medico_extra,
+            objetivo='Embarazo gameto propio',
+            fecha_inicio=timezone.now().date() - timedelta(days=90),
+            activo=True,
+            primera_consulta=primera_consulta_trans,
+            segunda_consulta=segunda_consulta_trans,
+        )
+
+        # Crear monitoreos completados
+        for i in range(1, 4):
+            Monitoreo.objects.create(
+                tratamiento=tratamiento_trans,
+                fecha_atencion=timezone.now() - timedelta(days=80 - (i * 10)),
+                descripcion=f'Monitoreo {i} completado. Evolución favorable.',
+                atendido=True,
+                fecha_realizado=timezone.now() - timedelta(days=80 - (i * 10)),
+            )
+        self.stdout.write(f'    ✅ 3 monitoreos completados')
+
+        # Crear punción
+        from Puncion.models import Puncion
+        puncion_trans = Puncion.objects.create(
+            paciente=paciente_trans,
+            fecha=timezone.now().date() - timedelta(days=50),
+            quirofano='Quirófano A'
+        )
+        self.stdout.write(f'    ✅ Punción creada (hace 50 días)')
+
+        # Crear ovocitos
+        ovocitos_trans = []
+        for j in range(1, 6):  # 5 ovocitos
+            def _three_letters(s: str) -> str:
+                clean = re.sub(r'[^A-Za-z]', '', (s or ''))
+                clean = clean.upper()
+                return (clean + 'XXX')[:3]
+
+            suffix = str(secrets.randbelow(10**7)).zfill(7)
+            identificador = f"OVO_{_three_letters(paciente_trans.last_name)}_{_three_letters(paciente_trans.first_name)}_{suffix}"
+            
+            from Ovocito.models import Ovocito as _OvocitoCheck
+            while _OvocitoCheck.objects.filter(identificador=identificador).exists():
+                suffix = str(secrets.randbelow(10**7)).zfill(7)
+                identificador = f"OVO_{_three_letters(paciente_trans.last_name)}_{_three_letters(paciente_trans.first_name)}_{suffix}"
+
+            ov = Ovocito.objects.create(
+                paciente=paciente_trans,
+                puncion=puncion_trans,
+                identificador=identificador,
+                madurez='maduro',
+                tipo_estado='fertilizado',
+                usado=True
+            )
+            ovocitos_trans.append(ov)
+        self.stdout.write(f'    ✅ 5 ovocitos creados (todos fertilizados)')
+
+        # Crear fertilizaciones (una por ovocito)
+        from Fertilizacion.models import Fertilizacion
+        fertilizaciones_trans = []
+        for ov in ovocitos_trans[:3]:  # Solo los primeros 3 que se convertirán en embriones
+            fert = Fertilizacion.objects.create(
+                ovocito=ov,
+                fecha_fertilizacion=timezone.now().date() - timedelta(days=45),
+                tecnica_icsi=True,
+                tecnica_fiv=False,
+                resultado='exitosa',
+                notas='Fertilización exitosa mediante ICSI',
+                semen_info='Semen de pareja'
+            )
+            fertilizaciones_trans.append(fert)
+        self.stdout.write(f'    ✅ 3 fertilizaciones creadas (ICSI exitosas)')
+
+        # Crear embriones
+        from Embrion.models import Embrion
+        from Historial_embrion.models import HistorialEmbrion
+        
+        embriones_trans = []
+        for k in range(len(fertilizaciones_trans)):  # 3 embriones de las 3 fertilizaciones
+            suffix_emb = str(secrets.randbelow(10**7)).zfill(7)
+            identificador_emb = f"EMB_{_three_letters(paciente_trans.last_name)}_{_three_letters(paciente_trans.first_name)}_{suffix_emb}"
+            
+            from Embrion.models import Embrion as _EmbrionCheck
+            while _EmbrionCheck.objects.filter(identificador=identificador_emb).exists():
+                suffix_emb = str(secrets.randbelow(10**7)).zfill(7)
+                identificador_emb = f"EMB_{_three_letters(paciente_trans.last_name)}_{_three_letters(paciente_trans.first_name)}_{suffix_emb}"
+
+            embrion = Embrion.objects.create(
+                identificador=identificador_emb,
+                fertilizacion=fertilizaciones_trans[k],
+                calidad=5 if k < 2 else 4,  # Calidad 5 para los primeros 2, calidad 4 para el tercero
+                estado='Fresco',
+                observaciones=f'Embrión de excelente calidad, día 5 blastocisto' if k < 2 else 'Embrión de buena calidad, día 5 blastocisto'
+            )
+            embriones_trans.append(embrion)
+            
+            # Crear historial del embrión
+            HistorialEmbrion.objects.create(
+                embrion=embrion,
+                paciente=paciente_trans,
+                estado='Fresco',
+                fecha=timezone.now() - timedelta(days=40),
+                nota=f'Embrión desarrollado a blastocisto día 5',
+                usuario=medico_extra
+            )
+        
+        self.stdout.write(f'    ✅ 3 embriones creados (2 calidad 5, 1 calidad 4)')
+        self.stdout.write(f'    🎯 Estado: Lista para transferencia - Tiene embriones de calidad disponibles')
