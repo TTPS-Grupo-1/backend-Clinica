@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from ..models import Ovocito
 from ..serializers import OvocitoSerializer
 from .create_ovocito_view import CreateOvocitoMixin
+from .update_ovocito_view import UpdateOvocitoMixin
 
 import logging
 
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class OvocitoViewSet(
     CreateOvocitoMixin,
+    UpdateOvocitoMixin,
     viewsets.ModelViewSet
 ):
     """
