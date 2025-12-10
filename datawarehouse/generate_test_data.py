@@ -23,7 +23,7 @@ PG_CONFIG = {
 
 # Cantidad de registros a generar
 CANTIDAD = {
-    'medicos': 15,
+    'medicos': 3,
     'pacientes': 200,
     'operadores': 8,
     'tratamientos': 350,
@@ -105,7 +105,7 @@ for i in range(1, CANTIDAD['medicos'] + 1):
     nombre = fake.first_name()
     apellido = fake.last_name()
     email = f"{nombre.lower()}.{apellido.lower()}@clinica.com.ar"
-    is_director = i <= 3  # Primeros 3 son directores
+    is_director = i == 1  # Solo el primero es director
     
     pg_cursor.execute("""
         INSERT INTO Dim_Medico (medico_id, dni, nombre_completo, email, activo, eliminado, is_director)
