@@ -183,12 +183,10 @@ print(f"✅ {len(operadores_ids)} operadores insertados\n")
 # ====================================
 print("🎯 [5/9] Poblando Dim_Objetivo...")
 objetivos = [
-    'Embarazo propio',
-    'Preservación de fertilidad',
-    'Donación de ovocitos',
-    'Gestación subrogada',
-    'Maternidad/Paternidad tardía',
-    'Parejas del mismo sexo'
+    'Pareja hombre y mujer',
+    'Pareja de dos femeninas',
+    'Pareja de dos femeninas (Metodo Ropa)',
+    'Mujer sin pareja'
 ]
 
 for obj in objetivos:
@@ -214,8 +212,8 @@ def get_tiempo_id(fecha):
 # ====================================
 print(f"💊 [6/9] Generando {CANTIDAD['tratamientos']} tratamientos...")
 tratamientos_ids = []
-etapas_posibles = ['Primera Consulta', 'Segunda Consulta', 'Punción', 'Fertilización', 'Transferencia']
-motivos_fin = ['Embarazo logrado', 'Suspendido por paciente', 'Sin éxito', 'Complicaciones médicas', None]
+etapas_posibles = ['Primera Consulta', 'Segunda Consulta', 'Monitoreo','Punción', 'Fertilización', 'Transferencia','Seguimiento', 'Finalizado']
+motivos_fin = ['Nacido vivo', 'Nacido no vivo', 'Tratamiento cancelado'] # esto acomodarlo
 
 for i in range(1, CANTIDAD['tratamientos'] + 1):
     paciente_id = random.choice(pacientes_ids)
@@ -287,8 +285,8 @@ print(f"✅ {len(tratamientos_ids)} tratamientos insertados\n")
 # ====================================
 print(f"🧬 [7/9] Generando {CANTIDAD['fertilizaciones']} fertilizaciones...")
 fertilizaciones_ids = []
-tecnicas = ['FIV', 'ICSI', 'IA']
-resultados = ['Exitosa', 'No exitosa', 'Parcialmente exitosa']
+tecnicas = ['FIV', 'ICSI']
+resultados = ['Exitosa', 'No exitosa']
 
 # Obtener IDs de técnicas
 tecnica_ids = {}
@@ -347,8 +345,8 @@ print(f"✅ {len(fertilizaciones_ids)} fertilizaciones insertadas\n")
 # ====================================
 print(f"🔬 [8/9] Generando {CANTIDAD['embriones']} embriones...")
 estados_embrion = ['fresco', 'criopreservado', 'transferido', 'descartado']
-calidades = ['A', 'B', 'C', 'D']
-resultados_pgt = ['Normal', 'Anormal', 'Mosaico', None]
+calidades = ['1', '2', '3', '4', '5']
+resultados_pgt = ['Exitoso', 'No exitoso']
 
 # Obtener IDs de estados y calidades
 estado_ids = {}
@@ -403,7 +401,7 @@ print(f"✅ {embrion_id - 1} embriones insertados\n")
 # 9. POBLAR FACT_OVOCITO
 # ====================================
 print(f"🥚 [9/9] Generando {CANTIDAD['ovocitos']} ovocitos...")
-estados_ovocito = ['fresco', 'criopreservado', 'usado', 'descartado']
+estados_ovocito = ['fresco', 'criopreservado', 'transferido', 'descartado']
 
 # Obtener IDs de estados
 estado_ovo_ids = {}
