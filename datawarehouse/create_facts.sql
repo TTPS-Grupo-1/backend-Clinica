@@ -114,6 +114,8 @@ CREATE TABLE IF NOT EXISTS Fact_Pago (
     fecha_pago DATE,
     pagado BOOLEAN DEFAULT FALSE,
     obra_social VARCHAR(100),
+    monto_cubierto_por_obra_social DECIMAL(10,2) DEFAULT 0,
+    monto_a_cobrar_al_paciente DECIMAL(10,2) DEFAULT 0,
     
     -- Claves foráneas
     fecha_key INT REFERENCES Dim_Tiempo(tiempo_id),

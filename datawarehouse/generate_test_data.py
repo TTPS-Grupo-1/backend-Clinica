@@ -31,6 +31,8 @@ CANTIDAD = {
     'embriones': 600,
     'ovocitos': 800,
     'monitoreos': 450,
+    'donaciones_semen': 50,
+    'pagos': 300,
 }
 
 # Inicializar Faker para datos realistas
@@ -210,10 +212,10 @@ def get_tiempo_id(fecha):
 # ====================================
 # 6. POBLAR FACT_TRATAMIENTO
 # ====================================
-print(f"💊 [6/9] Generando {CANTIDAD['tratamientos']} tratamientos...")
+print(f"💊 [6/12] Generando {CANTIDAD['tratamientos']} tratamientos...")
 tratamientos_ids = []
 etapas_posibles = ['Primera Consulta', 'Segunda Consulta', 'Monitoreo','Punción', 'Fertilización', 'Transferencia','Seguimiento', 'Finalizado']
-motivos_fin = ['Nacido vivo', 'Nacido no vivo', 'Tratamiento cancelado'] # esto acomodarlo
+motivos_fin = ['Embarazo logrado', 'No se logró embarazo', 'Tratamiento cancelado', 'Abandono del paciente']
 
 for i in range(1, CANTIDAD['tratamientos'] + 1):
     paciente_id = random.choice(pacientes_ids)
@@ -281,9 +283,39 @@ pg_conn.commit()
 print(f"✅ {len(tratamientos_ids)} tratamientos insertados\n")
 
 # ====================================
+# 6.5. POBLAR FACT_MONITOREO
+# ====================================
+print(f"📊 [7/12] Generando monitoreos para tratamientos...")
+monitoreo_id = 1
+
+for trat in tratamientos_ids:
+    # Solo agregar monitoreos si el tratamiento llegó a Segunda Consulta o más
+    etapas_idx = etapas_posibles.index(trat.get('etapa_alcanzada', 'Primera Consulta'))
+    if etapas_idx >= 1:  # Segunda Consulta o más
+        # Número variable de monitoreos por tratamiento (1-6)
+        num_monitoreos = random.randint(1, 6)
+        
+        for i in range(1, num_monitoreos + 1):
+            fecha_monitoreo = trat['fecha_inicio'] + timedelta(days=random.randint(10, 30) * i)
+            fecha_key = get_tiempo_id(fecha_monitoreo)
+            
+            pg_cursor.execute("""
+                INSERT INTO Fact_Monitoreo (tratamiento_id, fecha_monitoreo, numero_monitoreo, fecha_key, tratamiento_key)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING
+            """, (
+                trat['id'], fecha_monitoreo, i, fecha_key, trat['id']
+            ))
+            
+            monitoreo_id += 1
+
+pg_conn.commit()
+print(f"✅ {monitoreo_id - 1} monitoreos insertados\n")
+
+# ====================================
 # 7. POBLAR FACT_FERTILIZACION
 # ====================================
-print(f"🧬 [7/9] Generando {CANTIDAD['fertilizaciones']} fertilizaciones...")
+print(f"🧬 [8/12] Generando {CANTIDAD['fertilizaciones']} fertilizaciones...")
 fertilizaciones_ids = []
 tecnicas = ['FIV', 'ICSI']
 resultados = ['Exitosa', 'No exitosa']
@@ -304,7 +336,9 @@ for i, trat in enumerate(tratamientos_seleccionados, 1):
     tratamiento_id = trat['id']
     operador_id = random.choice(operadores_ids)
     tecnica = random.choice(tecnicas)
-    resultado = random.choice(resultados)
+    
+    # 60-70% exitosas, 30-40% no exitosas (distribución realista)
+    resultado = random.choices(['Exitosa', 'No exitosa'], weights=[0.65, 0.35])[0]
     
     # Fecha 20-40 días después del inicio del tratamiento
     fecha_fert = trat['fecha_inicio'] + timedelta(days=random.randint(20, 40))
@@ -343,7 +377,7 @@ print(f"✅ {len(fertilizaciones_ids)} fertilizaciones insertadas\n")
 # ====================================
 # 8. POBLAR FACT_EMBRION
 # ====================================
-print(f"🔬 [8/9] Generando {CANTIDAD['embriones']} embriones...")
+print(f"🔬 [9/12] Generando {CANTIDAD['embriones']} embriones...")
 estados_embrion = ['fresco', 'criopreservado', 'transferido', 'descartado']
 calidades = ['1', '2', '3', '4', '5']
 resultados_pgt = ['Exitoso', 'No exitoso']
@@ -371,7 +405,13 @@ for fert in fertilizaciones_ids:
         if embrion_id > CANTIDAD['embriones']:
             break
             
-        estado = random.choice(estados_embrion)
+        # Distribución realista de estados (no uniforme):
+        # 40% frescos, 30% criopreservados, 20% transferidos, 10% descartados
+        estado = random.choices(
+            estados_embrion, 
+            weights=[0.40, 0.30, 0.20, 0.10]
+        )[0]
+        
         calidad = random.choice(calidades)
         
         # 30% tienen PGT
@@ -400,7 +440,7 @@ print(f"✅ {embrion_id - 1} embriones insertados\n")
 # ====================================
 # 9. POBLAR FACT_OVOCITO
 # ====================================
-print(f"🥚 [9/9] Generando {CANTIDAD['ovocitos']} ovocitos...")
+print(f"🥚 [10/12] Generando {CANTIDAD['ovocitos']} ovocitos...")
 estados_ovocito = ['fresco', 'criopreservado', 'transferido', 'descartado']
 
 # Obtener IDs de estados
@@ -438,6 +478,109 @@ pg_conn.commit()
 print(f"✅ {CANTIDAD['ovocitos']} ovocitos insertados\n")
 
 # ====================================
+# 10. POBLAR FACT_DONACION_SEMEN
+# ====================================
+print(f"💧 [11/12] Generando {CANTIDAD['donaciones_semen']} donaciones de semen...")
+
+bancos = ['Banco Nacional de Semen', 'Cryo-Bank Argentina', 'Banco Genético SA', 'Paciente', None]
+
+for i in range(1, CANTIDAD['donaciones_semen'] + 1):
+    fecha_donacion = fake.date_between(start_date=datetime(2022, 1, 1), end_date=datetime(2024, 11, 30))
+    fecha_key = get_tiempo_id(fecha_donacion)
+    
+    # 60% utilizada, 40% no utilizada
+    utilizado = random.choices([True, False], weights=[0.60, 0.40])[0]
+    
+    # Origen del banco (70% externo, 30% paciente/interno)
+    banco_origen = random.choices(bancos, weights=[0.25, 0.25, 0.20, 0.25, 0.05])[0]
+    
+    pg_cursor.execute("""
+        INSERT INTO Fact_Donacion_Semen (
+            fecha_donacion, banco_origen, utilizado, fecha_key
+        ) VALUES (%s, %s, %s, %s)
+    """, (
+        fecha_donacion, banco_origen, utilizado, fecha_key
+    ))
+
+pg_conn.commit()
+print(f"✅ {CANTIDAD['donaciones_semen']} donaciones de semen insertadas\n")
+
+# ====================================
+# 11. POBLAR FACT_PAGO
+# ====================================
+print(f"💰 [12/12] Generando {CANTIDAD['pagos']} registros de pagos...")
+
+# Obtener IDs de obras sociales
+pg_cursor.execute("SELECT obra_social_id, nombre FROM Dim_Obra_Social")
+obras_sociales_db = pg_cursor.fetchall()
+
+for i in range(1, CANTIDAD['pagos'] + 1):
+    # Seleccionar tratamiento y obtener su paciente_id
+    tratamiento = random.choice(tratamientos_ids)
+    tratamiento_id = tratamiento['id']
+    
+    # Obtener el paciente_id del tratamiento
+    pg_cursor.execute("SELECT paciente_id FROM Fact_Tratamiento WHERE tratamiento_id = %s", (tratamiento_id,))
+    result = pg_cursor.fetchone()
+    paciente_id = result[0] if result else random.choice(pacientes_ids)
+    
+    # Montos entre 50,000 y 500,000 (pesos argentinos)
+    monto_total = random.randint(50000, 500000)
+    
+    # Obra social cubre 40-70% o 0% si no tiene cobertura
+    tiene_cobertura = random.choices([True, False], weights=[0.70, 0.30])[0]
+    
+    if tiene_cobertura and obras_sociales_db:
+        porcentaje_cobertura = random.uniform(0.40, 0.70)
+        monto_cubierto_por_obra_social = round(monto_total * porcentaje_cobertura, 2)
+        # El paciente paga el resto
+        monto_a_cobrar_al_paciente = monto_total - monto_cubierto_por_obra_social
+        
+        # Seleccionar una obra social
+        obra_social_id, obra_social_nombre = random.choice(obras_sociales_db)
+    else:
+        # Sin cobertura, el paciente paga todo
+        monto_cubierto_por_obra_social = 0.0
+        monto_a_cobrar_al_paciente = monto_total
+        obra_social_nombre = None
+        obra_social_id = None
+    
+    # Determinar monto pagado y deuda
+    estado_pago = random.choices(['Pagado', 'Pendiente', 'Parcial'], weights=[0.75, 0.15, 0.10])[0]
+    
+    if estado_pago == 'Pagado':
+        monto_pagado = monto_total
+        deuda = 0.0
+        pagado = True
+    elif estado_pago == 'Pendiente':
+        monto_pagado = 0.0
+        deuda = monto_total
+        pagado = False
+    else:  # Parcial
+        monto_pagado = round(monto_total * random.uniform(0.30, 0.70), 2)
+        deuda = monto_total - monto_pagado
+        pagado = False
+    
+    fecha_pago = fake.date_between(start_date=datetime(2022, 1, 1), end_date=datetime(2024, 11, 30))
+    fecha_key = get_tiempo_id(fecha_pago)
+    
+    pg_cursor.execute("""
+        INSERT INTO Fact_Pago (
+            paciente_id, tratamiento_id, monto, monto_pagado, deuda,
+            fecha_pago, pagado, obra_social, monto_cubierto_por_obra_social,
+            monto_a_cobrar_al_paciente, fecha_key, paciente_key, obra_social_key
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (pago_id) DO NOTHING
+    """, (
+        paciente_id, tratamiento_id, monto_total, monto_pagado, deuda,
+        fecha_pago, pagado, obra_social_nombre, monto_cubierto_por_obra_social,
+        monto_a_cobrar_al_paciente, fecha_key, paciente_id, obra_social_id
+    ))
+
+pg_conn.commit()
+print(f"✅ {CANTIDAD['pagos']} pagos insertados\n")
+
+# ====================================
 # RESUMEN FINAL
 # ====================================
 print("\n" + "=" * 70)
@@ -453,9 +596,12 @@ tablas = [
     ('Dim_Objetivo', 'dim_objetivo'),
     ('Dim_Obra_Social', 'dim_obra_social'),
     ('Fact_Tratamiento', 'fact_tratamiento'),
+    ('Fact_Monitoreo', 'fact_monitoreo'),
     ('Fact_Fertilizacion', 'fact_fertilizacion'),
     ('Fact_Embrion', 'fact_embrion'),
     ('Fact_Ovocito', 'fact_ovocito'),
+    ('Fact_Donacion_Semen', 'fact_donacion_semen'),
+    ('Fact_Pago', 'fact_pago'),
 ]
 
 print("\n📊 RESUMEN DE DATOS GENERADOS:")
