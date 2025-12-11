@@ -9,54 +9,22 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class CreateEmbrionMixin(APIView):
+class CreateEmbrionMixin:
 	"""
-	Vista para crear un embrión.
+	Mixin para crear un embrión en un ViewSet.
 	"""
-	def post(self, request):
-		serializer = EmbrionSerializer(data=request.data)
-		if not serializer.is_valid():
-			logger.warning(f"Errores de validación: {serializer.errors}")
-			return Response({
-				"success": False,
-				"message": "Hay errores en los campos ingresados.",
-				"errors": serializer.errors
-			}, status=status.HTTP_400_BAD_REQUEST)
-		try:
-			with transaction.atomic():
-				embrion = serializer.save()
-				logger.info(f"Embrion creado: {embrion.identificador}")
-				return Response({
-					"success": True,
-					"message": "Embrion registrado correctamente.",
-					"data": serializer.data
-				}, status=status.HTTP_201_CREATED)
-		except IntegrityError as e:
-			logger.error(f"Error de integridad: {str(e)}")
-			return Response({
-				"success": False,
-				"message": "El embrión ya existe o hay un campo duplicado."
-			}, status=status.HTTP_400_BAD_REQUEST)
-		except Exception as e:
-			logger.exception("Error inesperado al crear embrión.")
-			return Response({
-				"success": False,
-				"message": "Ocurrió un error al registrar el embrión."
-			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+	# No need to override create() since it's already properly handled in EmbrionViewSet
+	pass
 
-class UpdateEmbrionMixin(APIView):
+class UpdateEmbrionMixin:
 	"""
-	Vista para actualizar un embrión.
+	Mixin para actualizar un embrión en un ViewSet.
 	"""
-	def put(self, request, pk):
-		try:
-			embrion = Embrion.objects.get(pk=pk)
-		except Embrion.DoesNotExist:
-			return Response({
-				"success": False,
-				"message": "El embrión no existe."
-			}, status=status.HTTP_404_NOT_FOUND)
-		serializer = EmbrionSerializer(embrion, data=request.data, partial=True)
+	def update(self, request, *args, **kwargs):
+		partial = kwargs.pop('partial', False)
+		instance = self.get_object()
+		serializer = self.get_serializer(instance, data=request.data, partial=partial)
+		print(request.data)
 		if not serializer.is_valid():
 			logger.warning(f"Errores de validación: {serializer.errors}")
 			return Response({
@@ -85,3 +53,7 @@ class UpdateEmbrionMixin(APIView):
 				"success": False,
 				"message": "Ocurrió un error al actualizar el embrión."
 			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+	
+	def partial_update(self, request, *args, **kwargs):
+		kwargs['partial'] = True
+		return self.update(request, *args, **kwargs)
