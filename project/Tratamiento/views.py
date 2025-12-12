@@ -336,7 +336,10 @@ class TratamientoViewSet(viewsets.ModelViewSet):
             print(f"\n📊 Verificando seguimiento del tratamiento...")
             from Seguimiento.models import SeguimientoTratamiento
             
-            tiene_seguimiento = SeguimientoTratamiento.objects.filter(tratamiento=tratamiento).exists()
+            tiene_seguimiento = SeguimientoTratamiento.objects.filter(
+                tratamiento=tratamiento,
+                nacido_vivo__isnull=False
+            ).exists()
             print(f"📊 Tiene seguimiento: {tiene_seguimiento}")
             
             # ==========================================
