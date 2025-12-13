@@ -769,7 +769,7 @@ class TratamientoViewSet(viewsets.ModelViewSet):
             pacientes_ids_que_cumplen = []
             
             for tratamiento in tratamientos_activos:
-                estado_actual = tratamiento.estado_actual
+                estado_actual = tratamiento.estado_actual()
                 print(f"  📋 Paciente {tratamiento.paciente_id} - Tratamiento {tratamiento.id} - Estado: '{estado_actual}'")
                 if estado_actual in estados_lista:
                     pacientes_ids_que_cumplen.append(tratamiento.paciente_id)
@@ -777,7 +777,7 @@ class TratamientoViewSet(viewsets.ModelViewSet):
             # Obtener los pacientes completos con sus datos
             pacientes_obj = CustomUser.objects.filter(id__in=pacientes_ids_que_cumplen)
             pacientes_que_cumplen = CustomUserSerializer(pacientes_obj, many=True).data
-            
+            print(pacientes_que_cumplen)
             return Response({
                 "estados_buscados": estados_lista,
                 "pacientes_que_cumplen": pacientes_que_cumplen,

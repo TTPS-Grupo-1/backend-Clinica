@@ -109,9 +109,15 @@ class Tratamiento(models.Model):
         if hasattr(self, 'seguimiento_beta') and self.seguimiento_beta:
             return 'Finalizado'
 
-        # 3) Transferencia tiene prioridad sobre estados previos (FK directo)
-        if self.transferencia_id:
-            return 'Transferencia'
+        # 3) Transferencia tiene prioridad sobre estados previos
+        # Nota: La entidad Transferencia tiene FK a Tratamiento; evitar depender de self.transferencia_id
+        try:
+            from Transferencia.models import Transferencia
+            if Transferencia.objects.filter(tratamiento_id=self.id).exists():
+                return 'Transferencia'
+        except Exception:
+            # Si el import falla por ciclado, continuar con el resto
+            pass
 
         # 4) Detectar Fertilización y Embriones del paciente
         from Fertilizacion.models import Fertilizacion
@@ -125,7 +131,7 @@ class Tratamiento(models.Model):
             ovocitos_paciente = Ovocito.objects.filter(paciente_id=self.paciente_id).values_list('id_ovocito', flat=True)
             fert_qs = Fertilizacion.objects.filter(ovocito_id__in=ovocitos_paciente)
         
-        # Si hay embriones derivados, está en etapa de Transferencia
+        # Si hay embriones derivados, está listo para transferencia
         if fert_qs.exists():
             if Embrion.objects.filter(fertilizacion__in=fert_qs).exists():
                 return 'Transferencia'
