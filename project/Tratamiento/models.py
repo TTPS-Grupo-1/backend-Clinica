@@ -133,8 +133,6 @@ class Tratamiento(models.Model):
         
         # Si hay embriones derivados, está listo para transferencia
         if fert_qs.exists():
-            if Embrion.objects.filter(fertilizacion__in=fert_qs).exists():
-                return 'Transferencia'
             return 'Fertilización'
 
         # 5) Punción: si existe registro de punción del paciente
