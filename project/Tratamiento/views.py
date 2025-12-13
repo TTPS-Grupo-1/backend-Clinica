@@ -335,12 +335,19 @@ class TratamientoViewSet(viewsets.ModelViewSet):
             # ==========================================
             print(f"\n📊 Verificando seguimiento del tratamiento...")
             from Seguimiento.models import SeguimientoTratamiento
-            
-            tiene_seguimiento = SeguimientoTratamiento.objects.filter(
-                tratamiento=tratamiento,
+
+            seguimiento_qs = SeguimientoTratamiento.objects.filter(
+                tratamiento=tratamiento
+            )
+
+            tiene_seguimiento = seguimiento_qs.exists()
+
+            seguimiento_finalizado = seguimiento_qs.filter(
                 nacido_vivo__isnull=False
             ).exists()
+
             print(f"📊 Tiene seguimiento: {tiene_seguimiento}")
+            print(f"🏁 Seguimiento finalizado: {seguimiento_finalizado}")
             
             # ==========================================
             # 7. PUNCIÓN - Verificar si existe
@@ -363,6 +370,7 @@ class TratamientoViewSet(viewsets.ModelViewSet):
                 'monitoreos': monitoreos_data,  # 🔥 NUEVO
                 'transferencias': transferencias_data,  # 🔥 NUEVO
                 'tiene_seguimiento': tiene_seguimiento,  # 🔥 NUEVO
+                "seguimiento_finalizado": seguimiento_finalizado,
                 'existe_puncion': existe_puncion,  # 🔥 NUEVO
             }
             print(f"🔍 DEBUG: Respuesta preparada, enviando...")
@@ -373,6 +381,7 @@ class TratamientoViewSet(viewsets.ModelViewSet):
             print(f"   Monitoreos: {len(monitoreos_data)}")
             print(f"   Transferencias: {len(transferencias_data)}")
             print(f"   Seguimiento: {tiene_seguimiento}")
+            print(f"   Seguimiento finalizado: {seguimiento_finalizado}")
             print(f"   Punción: {existe_puncion}")
             print(f"{'='*60}\n")
             return Response(response_data, status=status.HTTP_200_OK)
