@@ -32,6 +32,22 @@ class CreateFertilizacionMixin(APIView):
                 fertilizacion = serializer.save()
                 logger.info(f"Fertilización creada: {fertilizacion}")
                 ovocito = fertilizacion.ovocito
+
+                # Asociar paciente directamente en Fertilizacion
+                try:
+                    if ovocito and getattr(ovocito, 'paciente_id', None):
+                        fertilizacion.paciente_id = ovocito.paciente_id
+                        fertilizacion.save(update_fields=["paciente_id"])
+                        logger.info(f"Paciente {ovocito.paciente_id} asociado a Fertilización {fertilizacion.id_fertilizacion}")
+                    else:
+                        # Fallback: si viene 'paciente' en el payload
+                        paciente_id = request.data.get('paciente') or request.data.get('paciente_id')
+                        if paciente_id:
+                            fertilizacion.paciente_id = int(paciente_id)
+                            fertilizacion.save(update_fields=["paciente_id"])
+                            logger.info(f"Paciente {paciente_id} asociado por payload a Fertilización {fertilizacion.id_fertilizacion}")
+                except Exception as e:
+                    logger.warning(f"No se pudo asociar paciente a Fertilización: {e}")
                 ovocito.usado = True
                 ovocito.save(update_fields=["usado"])
 

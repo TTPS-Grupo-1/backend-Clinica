@@ -132,42 +132,64 @@ class TratamientoViewSet(viewsets.ModelViewSet):
         try:
             # Obtener el tratamiento directamente sin filtros de get_queryset
             tratamiento = Tratamiento.objects.get(id=pk)
-            
+            estado = tratamiento.estado_actual()
             # Serializar el tratamiento
+            print(f"🔍 DEBUG: Tratamiento #{pk} encontrado, estado actual: {estado}")
             print(f"🔍 DEBUG: Serializando tratamiento...")
             tratamiento_data = self.get_serializer(tratamiento).data
             print(f"🔍 DEBUG: Tratamiento serializado correctamente")
             
             # ==========================================
-            # 1. OVOCITOS - De TODAS las punciones del paciente en este tratamiento
+            # 1. OVOCITOS - De TODAS las punciones del paciente en el rango del tratamiento
             # ==========================================
             print(f"\n{'='*60}")
             print(f"🔍 TRATAMIENTO #{pk} - Filtrando datos específicos")
             print(f"{'='*60}")
+            # Definir rango de fechas del tratamiento
+            fecha_inicio = tratamiento.fecha_inicio
+            fecha_fin = getattr(tratamiento, 'fecha_modificacion', None) or getattr(tratamiento, 'fecha_fin', None) or timezone.now()
+            # Normalizar a date para comparar con DateField como fecha_fertilizacion
+            start_date = fecha_inicio.date() if hasattr(fecha_inicio, 'date') else fecha_inicio
+            end_date = fecha_fin.date() if hasattr(fecha_fin, 'date') else fecha_fin
             
-            # Obtener todas las punciones del paciente
+            # Obtener todas las punciones del paciente dentro del rango del tratamiento
             from Puncion.models import Puncion
             punciones_paciente = Puncion.objects.filter(paciente=tratamiento.paciente)
             print(f"📊 Total de punciones del paciente: {punciones_paciente.count()}")
+
+            # Traer todas las punciones del paciente dentro del rango de fechas
+            punciones = punciones_paciente
+            if fecha_inicio:
+                punciones = punciones.filter(fecha__gte=fecha_inicio)
+            if fecha_fin:
+                punciones = punciones.filter(fecha__lte=fecha_fin)
+            print(f"📊 Punciones en rango ({fecha_inicio} → {fecha_fin}): {punciones.count()}")
             
-            # Si el tratamiento tiene punción OneToOne, priorizar esa
-            # Sino, usar todas las punciones del paciente durante el tratamiento
-            if tratamiento.puncion:
-                print(f"✅ Tratamiento tiene punción OneToOne ID: {tratamiento.puncion.id}")
-                punciones = [tratamiento.puncion]
-            else:
-                # Filtrar punciones por fecha del tratamiento
-                punciones = punciones_paciente.filter(
-                    fecha__gte=tratamiento.fecha_inicio
-                )
-                print(f"📊 Punciones durante el tratamiento (desde {tratamiento.fecha_inicio}): {punciones.count()}")
-            
-            # Recolectar ovocitos de TODAS las punciones
+            # Recolectar ovocitos del paciente, preferentemente vinculados a las punciones en rango
             ovocitos = []
-            for puncion in punciones:
-                ovocitos_puncion = list(Ovocito.objects.filter(puncion=puncion))
-                print(f"   📌 Punción ID={puncion.id} ({puncion.fecha}): {len(ovocitos_puncion)} ovocitos")
-                ovocitos.extend(ovocitos_puncion)
+            try:
+                # Preferencia: ovocitos del paciente asociados a las punciones en rango
+                ovocitos_qs = Ovocito.objects.filter(paciente=tratamiento.paciente)
+                if punciones.exists():
+                    ovocitos_qs = ovocitos_qs.filter(puncion__in=punciones)
+
+                # Aplicar rango por fecha de creación si existe el campo
+                if fecha_inicio:
+                    if hasattr(Ovocito, 'created_at'):
+                        ovocitos_qs = ovocitos_qs.filter(created_at__gte=fecha_inicio)
+                if fecha_fin:
+                    if hasattr(Ovocito, 'created_at'):
+                        ovocitos_qs = ovocitos_qs.filter(created_at__lte=fecha_fin)
+
+                ovocitos = list(ovocitos_qs)
+
+                # Log por punción para visibilidad
+                for puncion in punciones[:5]:
+                    count_p = Ovocito.objects.filter(paciente=tratamiento.paciente, puncion=puncion).count()
+                    print(f"   📌 Punción ID={puncion.id} ({puncion.fecha}): {count_p} ovocitos del paciente")
+            except Exception as e:
+                print(f"⚠️ Fallback ovocitos por paciente: {str(e)}")
+                ovocitos = list(Ovocito.objects.filter(paciente=tratamiento.paciente))
             
             print(f"📊 Total ovocitos de todas las punciones: {len(ovocitos)}")
             if ovocitos:
@@ -177,47 +199,69 @@ class TratamientoViewSet(viewsets.ModelViewSet):
             ovocitos_data = OvocitoSerializer(ovocitos, many=True).data
             
             # ==========================================
-            # 2. FERTILIZACIONES - De los ovocitos del paciente en este tratamiento
+            # 2. FERTILIZACIONES - De los ovocitos del paciente en el rango del tratamiento
             # ==========================================
             fertilizaciones_data = []
             fertilizaciones = []
             
-            if ovocitos:  
-                ovocitos_ids = [o.id_ovocito for o in ovocitos]
-                print(f"\n📊 Buscando fertilizaciones de {len(ovocitos_ids)} ovocitos")
-                fertilizaciones = Fertilizacion.objects.filter(ovocito_id__in=ovocitos_ids)
-                print(f"📊 Fertilizaciones encontradas: {fertilizaciones.count()}")
-                if fertilizaciones.exists():
-                    for fert in fertilizaciones[:5]:  # Mostrar solo las primeras 5
-                        print(f"   - Fertilización ID={fert.id_fertilizacion}, ovocito_id={fert.ovocito_id}")
-                fertilizaciones_data = FertilizacionSerializer(fertilizaciones, many=True).data
-            else:
-                # Fallback: buscar fertilizaciones del paciente durante el tratamiento
-                print(f"\n📊 Sin ovocitos específicos, buscando fertilizaciones del paciente...")
-                ovocitos_paciente = Ovocito.objects.filter(paciente=tratamiento.paciente)
-                if ovocitos_paciente.exists():
-                    fertilizaciones = Fertilizacion.objects.filter(
-                        ovocito__in=ovocitos_paciente,
-                        fecha_fertilizacion__gte=tratamiento.fecha_inicio
-                    )
-                    print(f"📊 Fertilizaciones del paciente desde {tratamiento.fecha_inicio}: {fertilizaciones.count()}")
-                    fertilizaciones_data = FertilizacionSerializer(fertilizaciones, many=True).data
+            # Buscar fertilizaciones del paciente directamente
+            # Preferir FK directo a paciente si existe; si no, usar relación por ovocito
+            from django.db.models import Q
+            fertilizaciones = Fertilizacion.objects.filter(
+                Q(paciente_id=tratamiento.paciente_id) |
+                Q(ovocito__isnull=False, ovocito__paciente_id=tratamiento.paciente_id)
+            )
+            # Asegurar consistencia: si existen con paciente_id distinto al del tratamiento, excluirlas
+            fertilizaciones = fertilizaciones.exclude(~Q(paciente_id=tratamiento.paciente_id), paciente_id__isnull=False)
+            print(f"\n📊 Fertilizaciones del paciente (antes de fechas): {fertilizaciones.count()}")
+
+            # Aplicar filtro de fechas a fertilizaciones: por fecha_fertilizacion y/o created_at
+            if start_date:
+                # Filtrar por fecha_fertilizacion con límites inclusivos usando fechas
+                fertilizaciones = fertilizaciones.filter(fecha_fertilizacion__gte=start_date)
+            if end_date:
+                fertilizaciones = fertilizaciones.filter(fecha_fertilizacion__lte=end_date)
+
+            print(f"📊 Fertilizaciones encontradas (rango aplicado): {fertilizaciones.count()}")
+            # Fallback: si no hay fertilizaciones en la ventana, intentar por paciente sin ventana
+            if not fertilizaciones.exists():
+                print("⚠️ Sin fertilizaciones en ventana. Probando fallback por paciente sin rango...")
+                fertilizaciones = Fertilizacion.objects.filter(paciente_id=tratamiento.paciente_id)
+                print(f"📊 Fallback fertilizaciones por paciente: {fertilizaciones.count()}")
+            if fertilizaciones.exists():
+                for fert in fertilizaciones[:5]:
+                    print(f"   - Fertilización ID={getattr(fert, 'id_fertilizacion', fert.pk)}, ovocito_id={getattr(fert, 'ovocito_id', None)}")
+            fertilizaciones_data = FertilizacionSerializer(fertilizaciones, many=True).data
 
             # ==========================================
             # 3. EMBRIONES - Solo de las fertilizaciones de este tratamiento
             # ==========================================
+            # Obtener embriones asociados a las fertilizaciones filtradas o directamente por paciente/ventana
             embriones = []
-            if fertilizaciones:  
+            from Embrion.models import Embrion as EmbrionModel
+            if fertilizaciones.exists():
                 print(f"\n📊 Buscando embriones de las fertilizaciones...")
-                for fert in fertilizaciones:
-                    try:
-                        emb = fert.embrion
-                        embriones.append(emb)
-                        print(f"   - Embrión ID={emb.id}, identificador={emb.identificador}, fertilizacion_id={fert.id_fertilizacion}")
-                    except Embrion.DoesNotExist:
-                        print(f"   ⚠️ Fertilización {fert.id_fertilizacion} no tiene embrión asociado")
+                embriones = list(EmbrionModel.objects.filter(fertilizacion__in=fertilizaciones))
             else:
-                print(f"❌ Sin fertilizaciones - No hay embriones para este tratamiento")
+                print(f"❌ Sin fertilizaciones filtradas - intentamos por paciente y ventana de fechas")
+                embriones = list(
+                    EmbrionModel.objects.filter(
+                        fertilizacion__paciente_id=tratamiento.paciente_id,
+                        fertilizacion__fecha_fertilizacion__gte=start_date,
+                        fertilizacion__fecha_fertilizacion__lte=end_date,
+                    )
+                )
+                if not embriones:
+                    print("⚠️ Fallback embriones por paciente sin rango...")
+                    embriones = list(
+                        EmbrionModel.objects.filter(
+                            fertilizacion__paciente_id=tratamiento.paciente_id
+                        )
+                    )
+            for emb in embriones[:5]:
+                print(
+                    f"   - Embrión ID={emb.id}, identificador={getattr(emb, 'identificador', '-')}, fertilizacion_id={getattr(emb, 'fertilizacion_id', '-')}" 
+                )
             
             print(f"\n✅ RESUMEN:")
             print(f"   Ovocitos: {len(ovocitos_data)}")
@@ -293,31 +337,7 @@ class TratamientoViewSet(viewsets.ModelViewSet):
             print(f"📊 Monitoreos encontrados: {monitoreos.count()}")
             monitoreos_data = MonitoreoSerializer(monitoreos, many=True).data
             
-            # ==========================================
-            # ⚠️ VALIDACIÓN: Si no hay segunda consulta ni monitoreos, no buscar datos avanzados
-            # ==========================================
-            if not tratamiento.segunda_consulta or not monitoreos.exists():
-                print(f"⚠️ ADVERTENCIA: Tratamiento sin segunda consulta ni monitoreos")
-                print(f"⚠️ No se buscarán ovocitos, fertilizaciones, embriones, transferencias ni seguimiento")
-                
-                response_data = {
-                    'tratamiento': tratamiento_data,
-                    'ovocitos': [],
-                    'fertilizaciones': [],
-                    'embriones': [],
-                    'primera_consulta': primera_consulta_data,
-                    'segunda_consulta': segunda_consulta_data,
-                    'antecedentes_ginecologicos': antecedentes_ginecologicos_data,
-                    'antecedentes_personales': antecedentes_personales_data,
-                    'resultados_estudios': resultados_estudios_data,
-                    'ordenes': ordenes_data,
-                    'monitoreos': monitoreos_data,
-                    'transferencias': [],
-                    'tiene_seguimiento': False,
-                    'existe_puncion': False,
-                }
-                print(f"🔍 DEBUG: Respuesta preparada (sin datos avanzados), enviando...")
-                return Response(response_data, status=status.HTTP_200_OK)
+            # Nota: Quitado el retorno temprano. Siempre se agregan datos disponibles.
             
             # ==========================================
             # 5. TRANSFERENCIAS - Del tratamiento
@@ -361,6 +381,7 @@ class TratamientoViewSet(viewsets.ModelViewSet):
                 'ovocitos': ovocitos_data,
                 'fertilizaciones': fertilizaciones_data,
                 'embriones': embriones_data,
+                'estado_actual': estado,
                 'primera_consulta': primera_consulta_data,
                 'segunda_consulta': segunda_consulta_data,
                 'antecedentes_ginecologicos': antecedentes_ginecologicos_data,
@@ -388,10 +409,11 @@ class TratamientoViewSet(viewsets.ModelViewSet):
 
         except Tratamiento.DoesNotExist:
             print(f"🚨 ERROR: Tratamiento con ID {pk} no encontrado")
-            return Response(
-                {"detail": f"Tratamiento con ID {pk} no encontrado."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return Response({
+                "detail": f"Tratamiento con ID {pk} no encontrado.",
+                "estado_actual": estado,
+                "status": status.HTTP_404_NOT_FOUND,
+            })
         except Exception as e:
             print(f"🚨 ERROR en detalles_completos: {str(e)}")
             import traceback
@@ -573,8 +595,8 @@ class TratamientoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Usar la propiedad estado_actual del modelo
-        estado = tratamiento_activo.estado_actual
+        # Usar el método estado_actual del modelo (invocar correctamente)
+        estado = tratamiento_activo.estado_actual()
         print(f"🧩 Estado encontrado: {estado}")
 
         return Response(

@@ -473,17 +473,19 @@ class Command(BaseCommand):
                 'ROPA - Una aporta la célula y la otra el óvulo',  # Técnica ROPA
             ]
             
+            # Desactivar tratamientos activos previos del paciente (solo puede tener uno activo)
+            Tratamiento.objects.filter(paciente=paciente, activo=True).update(activo=False)
+            
             # Crear Tratamiento asociado a la Primera Consulta
-            tratamiento, created = Tratamiento.objects.get_or_create(
+            tratamiento = Tratamiento.objects.create(
                 paciente=paciente,
                 medico=medico,
-                defaults={
-                    'objetivo': objetivos[i % len(objetivos)],
-                    'fecha_inicio': timezone.now().date() - timedelta(days=30),
-                    'activo': True,
-                    'primera_consulta': primera_consulta,
-                }
+                objetivo=objetivos[i % len(objetivos)],
+                fecha_inicio=timezone.now().date() - timedelta(days=30),
+                activo=True,
+                primera_consulta=primera_consulta,
             )
+            created = True
             
             if created:
                 self.stdout.write(
@@ -850,6 +852,29 @@ class Command(BaseCommand):
         medico_extra.set_password('12345678')
         medico_extra.save()
 
+        # =============================
+        # BACKFILL: Asociar paciente a fertilizaciones existentes
+        # =============================
+        self.stdout.write('\n🧬 Backfilling paciente en fertilizaciones...')
+        try:
+            from Fertilizacion.models import Fertilizacion
+            backfilled = 0
+            for f in Fertilizacion.objects.select_related('ovocito').all():
+                if getattr(f, 'paciente_id', None) is None and f.ovocito_id:
+                    # Asociar paciente desde el ovocito vinculado
+                    try:
+                        paciente_id = f.ovocito.paciente_id
+                        if paciente_id:
+                            f.paciente_id = paciente_id
+                            f.save(update_fields=['paciente_id'])
+                            backfilled += 1
+                    except Exception:
+                        # Si por alguna razón el ovocito no tiene paciente, continuar
+                        continue
+            self.stdout.write(f'✅ Fertilizaciones backfilled: {backfilled}')
+        except Exception as e:
+            self.stdout.write(f'⚠️ No se pudo realizar backfill de fertilizaciones: {e}')
+
         # 2. Crear horarios en la API para el médico extra
         exito, _ = self.crear_horarios_masivos_api(
             medico_id=medico_extra.id,
@@ -980,6 +1005,9 @@ class Command(BaseCommand):
             examen_fisico_2='Signos vitales normales'
         )
 
+        # Desactivar tratamientos activos previos
+        Tratamiento.objects.filter(paciente=paciente_pc, activo=True).update(activo=False)
+        
         # Crear Tratamiento con Primera Consulta completada
         tratamiento_pc = Tratamiento.objects.create(
             paciente=paciente_pc,
@@ -1055,6 +1083,9 @@ class Command(BaseCommand):
             ovocito_viable=True,
         )
 
+        # Desactivar tratamientos activos previos
+        Tratamiento.objects.filter(paciente=paciente_sc, activo=True).update(activo=False)
+        
         # Crear Tratamiento con ambas consultas completadas
         tratamiento_sc = Tratamiento.objects.create(
             paciente=paciente_sc,
@@ -1140,6 +1171,9 @@ class Command(BaseCommand):
             ovocito_viable=True,
         )
 
+        # Desactivar tratamientos activos previos
+        Tratamiento.objects.filter(paciente=paciente_mon, activo=True).update(activo=False)
+        
         # Crear Tratamiento
         tratamiento_mon = Tratamiento.objects.create(
             paciente=paciente_mon,
@@ -1243,6 +1277,9 @@ class Command(BaseCommand):
             ovocito_viable=True,
         )
 
+        # Desactivar tratamientos activos previos
+        Tratamiento.objects.filter(paciente=paciente_fin, activo=True).update(activo=False)
+        
         # Crear Tratamiento
         tratamiento_fin = Tratamiento.objects.create(
             paciente=paciente_fin,
@@ -1311,6 +1348,9 @@ class Command(BaseCommand):
             ovocito_viable=True,
         )
 
+        # Desactivar tratamientos activos previos
+        Tratamiento.objects.filter(paciente=paciente_trans, activo=True).update(activo=False)
+        
         # Crear Tratamiento
         tratamiento_trans = Tratamiento.objects.create(
             paciente=paciente_trans,
@@ -1375,6 +1415,7 @@ class Command(BaseCommand):
         for ov in ovocitos_trans[:3]:  # Solo los primeros 3 que se convertirán en embriones
             fert = Fertilizacion.objects.create(
                 ovocito=ov,
+                paciente=paciente_trans,  # Asignar paciente directamente
                 fecha_fertilizacion=timezone.now().date() - timedelta(days=45),
                 tecnica_icsi=True,
                 tecnica_fiv=False,

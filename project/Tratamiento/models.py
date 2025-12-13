@@ -96,11 +96,10 @@ class Tratamiento(models.Model):
         # `nombre` no existe en este modelo; usar id y paciente para evitar AttributeError
         return f"Tratamiento #{self.id} - {self.paciente.get_full_name() or self.paciente.username}"
     
-    @property
     def estado_actual(self):
         """
         Calcula y devuelve el estado actual del tratamiento basándose en los datos relacionados.
-        Replica la lógica del frontend getEstadoTexto pero del lado del servidor.
+        Prioridad: Finalizado > Transferencia (con FK o embriones) > Fertilización > Punción > Monitoreos > Consultas.
         """
         # 1) Si el tratamiento no está activo, está finalizado
         if not self.activo:
@@ -110,40 +109,40 @@ class Tratamiento(models.Model):
         if hasattr(self, 'seguimiento_beta') and self.seguimiento_beta:
             return 'Finalizado'
 
-        # 3) Transferencia tiene prioridad sobre estados previos
+        # 3) Transferencia tiene prioridad sobre estados previos (FK directo)
         if self.transferencia_id:
             return 'Transferencia'
 
-        # 4) Fertilización: detectar fertilizaciones vinculadas a la punción
-        #    o del paciente como fallback si no hay punción cargada
-        try:
-            from Fertilizacion.models import Fertilizacion
-            if self.puncion_id:
-                fertilizaciones = Fertilizacion.objects.filter(ovocito__puncion_id=self.puncion_id)
-            else:
-                # Fallback: buscar fertilizaciones por paciente
-                fertilizaciones = Fertilizacion.objects.filter(ovocito__paciente_id=self.paciente_id)
-            if fertilizaciones.exists():
-                return 'Fertilización'
-        except Exception:
-            # Si hay algún error al importar/consultar, no bloquear el cálculo de estado
-            pass
+        # 4) Detectar Fertilización y Embriones del paciente
+        from Fertilizacion.models import Fertilizacion
+        from Embrion.models import Embrion
+        from Ovocito.models import Ovocito
+        
+        # Buscar fertilizaciones: primero por paciente_id directo, sino via ovocito
+        fert_qs = Fertilizacion.objects.filter(paciente_id=self.paciente_id)
+        if not fert_qs.exists():
+            # Fallback: buscar ovocitos del paciente y luego sus fertilizaciones
+            ovocitos_paciente = Ovocito.objects.filter(paciente_id=self.paciente_id).values_list('id_ovocito', flat=True)
+            fert_qs = Fertilizacion.objects.filter(ovocito_id__in=ovocitos_paciente)
+        
+        # Si hay embriones derivados, está en etapa de Transferencia
+        if fert_qs.exists():
+            if Embrion.objects.filter(fertilizacion__in=fert_qs).exists():
+                return 'Transferencia'
+            return 'Fertilización'
 
-        # 5) Punción: si existe registro de punción, indicar ese estado
-        if self.puncion_id:
+        # 5) Punción: si existe registro de punción del paciente
+        from Puncion.models import Puncion
+        if self.puncion_id or Puncion.objects.filter(paciente_id=self.paciente_id).exists():
             return 'Punción'
 
-        # 6) Monitoreos: si existen, revisar si están todos finalizados
-        try:
-            monitoreos = getattr(self, 'lista_monitoreos', None)
-            if monitoreos is not None:
-                qs = monitoreos.all()
-                if qs.exists():
-                    if qs.filter(atendido=False).exists():
-                        return 'Monitoreos'
-                    return 'Monitoreos finalizados'
-        except Exception:
-            pass
+        # 6) Monitoreos: solo retornar si NO avanzó a etapas posteriores
+        from Monitoreo.models import Monitoreo
+        qs = Monitoreo.objects.filter(tratamiento=self)
+        if qs.exists():
+            if qs.filter(atendido=False).exists():
+                return 'Monitoreos'
+            return 'Monitoreos finalizados'
 
         # 7) Consultas
         if self.segunda_consulta_id:

@@ -19,6 +19,16 @@ class Fertilizacion(models.Model):
 	"""
 
 	id_fertilizacion = models.AutoField(primary_key=True)
+
+	# Nuevo: vínculo directo al paciente para simplificar consultas
+	paciente = models.ForeignKey(
+		'CustomUser.CustomUser',
+		on_delete=models.CASCADE,
+		related_name='fertilizaciones',
+		null=True,
+		blank=True,
+		help_text='Paciente al que pertenece esta fertilización (redundante con Ovocito.paciente, ayuda a consultas rápidas)'
+	)
 	ovocito = models.ForeignKey(
 		'Ovocito.Ovocito',
 		on_delete=models.CASCADE,
