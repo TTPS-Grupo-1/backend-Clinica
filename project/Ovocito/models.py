@@ -53,13 +53,13 @@ class Ovocito(models.Model):
 	ESTADO_FRESCO = 'fresco'
 	ESTADO_CRIOPRESERVADO = 'criopreservado'
 	ESTADO_DESCARTADO = 'descartado'
-	ESTADO_TRANSFERIDO = 'transferido'
+	ESTADO_FERTILIZADO = 'fertilizado'
 
 	TIPO_ESTADO_CHOICES = [
 		(ESTADO_FRESCO, 'Fresco'),
 		(ESTADO_CRIOPRESERVADO, 'Criopreservado'),
 		(ESTADO_DESCARTADO, 'Descartado'),
-		(ESTADO_TRANSFERIDO, 'Transferido'),
+		(ESTADO_FERTILIZADO, 'Fertilizado'),
 	]
 
 	tipo_estado = models.CharField(max_length=20, choices=TIPO_ESTADO_CHOICES, default=ESTADO_FRESCO)

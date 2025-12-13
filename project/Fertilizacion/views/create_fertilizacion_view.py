@@ -7,6 +7,7 @@ import logging
 
 from ..serializers import FertilizacionSerializer
 from ..models import Fertilizacion
+from Historial_ovocito.models import HistorialOvocito
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +50,23 @@ class CreateFertilizacionMixin(APIView):
                 except Exception as e:
                     logger.warning(f"No se pudo asociar paciente a Fertilización: {e}")
                 ovocito.usado = True
-                ovocito.save(update_fields=["usado"])
+                ovocito.tipo_estado = 'fertilizado'
+                ovocito.save(update_fields=["usado", "tipo_estado"])
 
-                logger.info(f"Ovocito {ovocito.id_ovocito} marcado como usado")
+                logger.info(f"Ovocito {ovocito.id_ovocito} marcado como usado y fertilizado")
+
+                # Registrar en el historial del ovocito
+                try:
+                    HistorialOvocito.objects.create(
+                        ovocito=ovocito,
+                        paciente=ovocito.paciente,
+                        estado='fertilizado',
+                        nota=f'Fertilización {fertilizacion.id_fertilizacion} - Técnica: {fertilizacion.tecnica}',
+                        usuario=request.user if request.user.is_authenticated else None
+                    )
+                    logger.info(f"Historial de ovocito {ovocito.id_ovocito} actualizado: fertilizado")
+                except Exception as e:
+                    logger.warning(f"No se pudo crear historial de ovocito: {e}")
 
                 result = {
                     "success": True,
