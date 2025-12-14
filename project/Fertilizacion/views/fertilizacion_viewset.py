@@ -346,6 +346,51 @@ class FertilizacionViewSet(viewsets.ModelViewSet):
 						logger.warning(f"⚠️ No se pudo crear historial de ovocito: {e}")
 				elif fertilizacion.ovocito_donado_id:
 					logger.info(f"🏦 Fertilización creada con ovocito donado: ID={fertilizacion.ovocito_donado_id}, info={fertilizacion.ovocito_donado_info}")
+					
+					# Crear registro local del ovocito donado
+					try:
+						from Ovocito.models import Ovocito
+						
+						# Obtener información del paciente
+						paciente = fertilizacion.paciente if fertilizacion.paciente else None
+						
+						if paciente:
+							# Crear ovocito local representando el donado
+							ovocito_donado_local = Ovocito.objects.create(
+								identificador=f"DONADO_{fertilizacion.ovocito_donado_id}_{fertilizacion.id_fertilizacion}",
+								paciente=paciente,
+								madurez='maduro',  # Los ovocitos donados son maduros
+								tipo_estado='fertilizado',  # Ya se está usando para fertilizar
+								usado=True,
+								puncion=None  # No tiene punción porque es donado
+							)
+							logger.info(f"✅ Ovocito donado creado localmente: {ovocito_donado_local.id_ovocito}")
+							
+							# Vincular el ovocito local a la fertilización
+							fertilizacion.ovocito = ovocito_donado_local
+							fertilizacion.save(update_fields=['ovocito'])
+							
+							# Crear historial
+							HistorialOvocito.objects.create(
+								ovocito=ovocito_donado_local,
+								paciente=paciente,
+								estado='fresco',
+								nota=f'Ovocito donado del banco externo (ID: {fertilizacion.ovocito_donado_id})',
+								usuario=request.user if request.user.is_authenticated else None
+							)
+							
+							HistorialOvocito.objects.create(
+								ovocito=ovocito_donado_local,
+								paciente=paciente,
+								estado='fertilizado',
+								nota=f'Fertilización {fertilizacion.id_fertilizacion} - Técnica: {"ICSI" if fertilizacion.tecnica_icsi else "FIV"}',
+								usuario=request.user if request.user.is_authenticated else None
+							)
+							logger.info(f"✅ Historial de ovocito donado creado")
+						else:
+							logger.warning("⚠️ No se pudo crear ovocito donado local: falta paciente")
+					except Exception as e:
+						logger.error(f"❌ Error creando ovocito donado local: {e}")
 
 				# Construir respuesta final
 				result = {
